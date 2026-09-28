@@ -4,9 +4,10 @@ An on-demand **5G RAN + core sandbox** on OpenShift with a live **PTP timing-fau
 
 You open a web console, start a RAN, watch a UE attach, inject a timing fault, and ask an agent why the cell went down. Every panel on the page reads a running component. None of the page's content is scripted.
 
-[![End-to-end sequence: start RAN, inject timing fault, agentic RCA, heal and stop](docs/diagrams/sequence.png)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.pdf)
+[![High-level sequence: start RAN, inject timing fault, agentic RCA, heal and stop](docs/diagrams/sequence-overview.png)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-overview.pdf)
 
-<sub>End-to-end sequence across the 11 components. Links: [PDF (vector)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.pdf) · [LaTeX source](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.tex). Rebuild: `cd docs/diagrams && pdflatex sequence.tex && pdftoppm -png -r 144 -singlefile sequence.pdf sequence`</sub>
+**Sequence diagrams:** the high-level view is above ([PDF](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-overview.pdf)). For every call, lane by lane across all 11 components, see the **[detailed sequence diagram (PDF)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-detailed.pdf)** ([PNG](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-detailed.png)).
+<sub>LaTeX sources: [sequence-overview.tex](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-overview.tex), [sequence-detailed.tex](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-detailed.tex). Rebuild: `cd docs/diagrams && pdflatex <name>.tex && pdftoppm -png -r 144 -singlefile <name>.pdf <name>`</sub>
 
 ## What the demo shows
 
@@ -94,7 +95,7 @@ src/                  The code, laid out as in the upstream telco-lab repo so im
   services/orchestrator/nep_orchestrator.py   RCA agent
   extensions/sheldon/agentic/            MCP gateway + plane servers
 tests/                e2e_local.py (no cluster), smoke_route.py (deployed), stub_kube.py
-docs/                 deployment, demo walkthrough, architecture, reference; diagrams/ (LaTeX sequence diagram)
+docs/                 deployment, demo walkthrough, architecture, reference; diagrams/ (LaTeX sequence diagrams: overview + detailed)
 ```
 
 ## Status
