@@ -4,39 +4,9 @@ An on-demand **5G RAN + core sandbox** on OpenShift with a live **PTP timing-fau
 
 You open a web console, start a RAN, watch a UE attach, inject a timing fault, and ask an agent why the cell went down. Every panel on the page reads a running component. None of the page's content is scripted.
 
-```mermaid
-flowchart LR
-    UI["Cloud RAN AI Sandbox<br/>(web console, Route)"]
-    subgraph slice["ran-slice pod (on demand, 0 ⇄ 1)"]
-        direction TB
-        CORE["5G core<br/>NRF · UDM/AUSF · AMF · SMF · UPF · …"]
-        RAN["O-RAN split RAN<br/>O-CU-CP · O-CU-UP · O-DU · O-RU"]
-        RAN --- CORE
-    end
-    UE["ue_sim<br/>(5G-AKA, PDU session, GTP-U)"]
-    PTP["ptp-bridge<br/>(timing plane)"]
-    NEP["nep-orchestrator<br/>(RCA agent)"]
-    CAPIF["CAPIF<br/>(TS 29.222)"]
-    GW["MCP gateway"]
-    subgraph planes["MCP plane servers"]
-        M1["O-Cloud"]
-        M2["RAN (O-DU O1)"]
-        M3["PTP"]
-        M4["NIC (emulated)"]
-    end
-    LLM["LLM (optional)<br/>OpenAI-compatible"]
+[![End-to-end sequence: start RAN, inject timing fault, agentic RCA, heal and stop](docs/diagrams/sequence.png)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.pdf)
 
-    UI -- "Start / Stop: scale" --> slice
-    UI -- "attach" --> UE --> RAN
-    UI -- "Inject / Heal" --> PTP
-    UI -- "Inject / Heal: O1 lock" --> RAN
-    UI -- "Run RCA" --> NEP
-    NEP -- "token" --> CAPIF
-    NEP -- "tools/call + token" --> GW --> planes
-    M2 --> RAN
-    M3 --> PTP
-    NEP -. "narrate evidence" .-> LLM
-```
+<sub>End-to-end sequence across the 11 components. Links: [PDF (vector)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.pdf) · [LaTeX source](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence.tex). Rebuild: `cd docs/diagrams && pdflatex sequence.tex && pdftoppm -png -r 144 -singlefile sequence.pdf sequence`</sub>
 
 ## What the demo shows
 
@@ -124,7 +94,7 @@ src/                  The code, laid out as in the upstream telco-lab repo so im
   services/orchestrator/nep_orchestrator.py   RCA agent
   extensions/sheldon/agentic/            MCP gateway + plane servers
 tests/                e2e_local.py (no cluster), smoke_route.py (deployed), stub_kube.py
-docs/
+docs/                 deployment, demo walkthrough, architecture, reference; diagrams/ (LaTeX sequence diagram)
 ```
 
 ## Status
