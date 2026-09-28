@@ -1,0 +1,29 @@
+# Optional GitOps: let Argo CD (or OpenShift GitOps) own deploy/openshift.
+# 1. Point repoURL at your fork/mirror and give Argo CD read access to it.
+# 2. oc apply -f deploy/argocd/application.yaml   (in the namespace Argo CD watches)
+# The image is still built with `oc start-build mvrca --from-dir=.` (or your CI).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multivendor-rca
+  namespace: openshift-gitops          # or `argocd` for upstream Argo CD
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<you>/multivendor-agentic-rca.git
+    targetRevision: main
+    path: deploy/openshift
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: multivendor-rca
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+  # The sandbox's Start/Stop buttons scale ran-slice 0 <-> 1; don't let self-heal undo that.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: ran-slice
+      jsonPointers: [/spec/replicas]

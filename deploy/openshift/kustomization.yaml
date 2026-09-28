@@ -1,0 +1,27 @@
+# Deploy everything:   oc apply -k deploy/openshift
+# To use a different namespace, change `namespace:` AND the namespace inside `images.newName`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: multivendor-rca
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: multivendor-rca
+    includeSelectors: false
+resources:
+  - build.yaml
+  - ran-sandbox.yaml
+  - ran-slice.yaml
+  - ptp-bridge.yaml
+  - capif.yaml
+  - mcp.yaml
+  - nep-orchestrator.yaml
+images:
+  - name: mvrca        # every Deployment says `image: mvrca`; this points it at the in-cluster build
+    newName: image-registry.openshift-image-registry.svc:5000/multivendor-rca/mvrca
+    newTag: latest
+configMapGenerator:
+  - name: gateway-policy
+    files:
+      - gateway-policy.yaml
+generatorOptions:
+  disableNameSuffixHash: true

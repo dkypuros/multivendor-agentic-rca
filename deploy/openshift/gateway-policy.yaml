@@ -1,0 +1,20 @@
+# MCP gateway policy. The NEP orchestrator presents a CAPIF-issued bearer token
+# (3GPP TS 29.222); the gateway checks issuer + expiry and maps the token's API scope
+# to the tool globs below, then routes each tool call to its plane's MCP server.
+tokenVerification:
+  mode: capif
+  capifIssuer: capif-core
+capifScopeMap:
+  mcp-tools:  ["ocloud_*", "ran_*", "nic_*", "ptp_*"]
+  mcp-ocloud: ["ocloud_*"]
+  mcp-timing: ["ptp_*"]
+backends:
+  - {name: ocloud, url: "http://mcp-ocloud:8850"}
+  - {name: ran,    url: "http://mcp-ran:8851"}
+  - {name: intel,  url: "http://mcp-intel:8852"}
+  - {name: redhat, url: "http://mcp-redhat:8853"}
+routes:
+  - {match: "ocloud_*", backend: ocloud}
+  - {match: "ran_*",    backend: ran}
+  - {match: "nic_*",    backend: intel}
+  - {match: "ptp_*",    backend: redhat}

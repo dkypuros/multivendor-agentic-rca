@@ -1,0 +1,49 @@
+# On-demand RAN slice: ONE pod running launch_slice.py with the "ran" profile -- the 5G core
+# (NRF/UDM/AMF/SMF/UPF + SBA NFs + IMS) and the O-RAN split RAN (O-CU-CP/O-CU-UP/O-DU/O-RU),
+# co-located so the NFs reach each other on loopback. replicas: 0 on purpose -- the sandbox's
+# Start/Stop buttons scale it 0 <-> 1. (With Argo CD, ignore /spec/replicas: deploy/argocd/.)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ran-slice
+  labels: { app: ran-slice }
+spec:
+  replicas: 0
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: ran-slice }
+  template:
+    metadata:
+      labels: { app: ran-slice }
+    spec:
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: slice
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "deploy/docker/launch_slice.py"]
+          env:
+            - { name: TELCO_SLICE_PROFILE, value: "ran" }
+            - { name: TELCO_PORT_OFFSET, value: "0" }
+            - { name: TELCO_BIND, value: "0.0.0.0" }
+            - { name: TELCO_HOST, value: "127.0.0.1" }
+          ports:
+            - { name: odu-http, containerPort: 7010, protocol: TCP }
+            - { name: uu, containerPort: 7011, protocol: UDP }
+          readinessProbe:
+            httpGet: { path: /o1/status, port: 7010 }
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ran-slice
+spec:
+  selector: { app: ran-slice }
+  ports:
+    - { name: odu-http, port: 7010, targetPort: 7010, protocol: TCP }   # O-DU RRC/F1AP + O1
+    - { name: uu, port: 7011, targetPort: 7011, protocol: UDP }         # O-DU Uu user plane

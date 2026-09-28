@@ -1,0 +1,25 @@
+# The single image every component runs. Build it from your checkout with:
+#   oc start-build mvrca --from-dir=. --follow
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: mvrca
+spec: {}
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: mvrca
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: mvrca:latest
+  resources:
+    limits: { cpu: "1", memory: 1Gi }

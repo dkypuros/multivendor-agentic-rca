@@ -1,0 +1,35 @@
+# CAPIF core function (3GPP TS 29.222): the NEP orchestrator onboards as an API invoker and
+# gets a scoped token that the MCP gateway checks before any tool call.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capif
+  labels: { app: capif }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: capif }
+  template:
+    metadata:
+      labels: { app: capif }
+    spec:
+      containers:
+        - name: capif
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "services/core/capif/capif.py"]
+          env:
+            - { name: TELCO_BIND, value: "0.0.0.0" }
+            - { name: TELCO_PORT_OFFSET, value: "0" }
+          ports: [{ name: http, containerPort: 7027 }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capif
+spec:
+  selector: { app: capif }
+  ports: [{ name: http, port: 7027, targetPort: 7027 }]

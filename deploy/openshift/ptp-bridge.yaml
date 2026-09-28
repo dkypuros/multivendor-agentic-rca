@@ -1,0 +1,33 @@
+# PTP timing-plane bridge: ptp4l-style state (offset, port state, CloudEvents) with
+# POST /ptp/inject and /ptp/heal for fault injection. Software model, no PHC hardware.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ptp-bridge
+  labels: { app: ptp-bridge }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ptp-bridge }
+  template:
+    metadata:
+      labels: { app: ptp-bridge }
+    spec:
+      containers:
+        - name: ptp-bridge
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "services/smo/ptp_bridge.py"]
+          env: [{ name: PTP_BRIDGE_PORT, value: "7091" }]
+          ports: [{ name: http, containerPort: 7091 }]
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ptp-bridge
+spec:
+  selector: { app: ptp-bridge }
+  ports: [{ name: http, port: 7091, targetPort: 7091 }]

@@ -1,0 +1,169 @@
+# MCP gateway + the four "plane" MCP servers the NEP orchestrator fans out to.
+# The gateway validates the CAPIF token and routes tool calls by name (gateway-policy.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-gateway
+  labels: { app: mcp-gateway }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-gateway }
+  template:
+    metadata:
+      labels: { app: mcp-gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "-m", "extensions.sheldon.agentic.gateway",
+                    "--host", "0.0.0.0", "--port", "8800", "--policy", "/etc/gateway/gateway-policy.yaml"]
+          ports: [{ name: http, containerPort: 8800 }]
+          volumeMounts: [{ name: policy, mountPath: /etc/gateway }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+      volumes:
+        - name: policy
+          configMap: { name: gateway-policy }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-gateway
+spec:
+  selector: { app: mcp-gateway }
+  ports: [{ name: http, port: 8800, targetPort: 8800 }]
+---
+# O-Cloud plane: OCM/ACM ManagedCluster health (needs ACM + kubectl; reports unavailable without)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-ocloud
+  labels: { app: mcp-ocloud }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-ocloud }
+  template:
+    metadata:
+      labels: { app: mcp-ocloud }
+    spec:
+      containers:
+        - name: mcp
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "ocloud", "--port", "8850"]
+          ports: [{ name: http, containerPort: 8850 }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-ocloud
+spec:
+  selector: { app: mcp-ocloud }
+  ports: [{ name: http, port: 8850, targetPort: 8850 }]
+---
+# RAN plane: the O-DU's O1 cell state and TS 28.532 alarms
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-ran
+  labels: { app: mcp-ran }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-ran }
+  template:
+    metadata:
+      labels: { app: mcp-ran }
+    spec:
+      containers:
+        - name: mcp
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "ran", "--port", "8851"]
+          env:
+            - { name: RAN_O1_URL, value: "http://ran-slice:7010" }
+          ports: [{ name: http, containerPort: 8851 }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-ran
+spec:
+  selector: { app: mcp-ran }
+  ports: [{ name: http, port: 8851, targetPort: 8851 }]
+---
+# Hardware plane: Intel NIC timestamp counters (EMULATED; no E810)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-intel
+  labels: { app: mcp-intel }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-intel }
+  template:
+    metadata:
+      labels: { app: mcp-intel }
+    spec:
+      containers:
+        - name: mcp
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "intel", "--port", "8852"]
+          ports: [{ name: http, containerPort: 8852 }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-intel
+spec:
+  selector: { app: mcp-intel }
+  ports: [{ name: http, port: 8852, targetPort: 8852 }]
+---
+# Timing plane: ptp4l offset / port state from ptp-bridge
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-redhat
+  labels: { app: mcp-redhat }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-redhat }
+  template:
+    metadata:
+      labels: { app: mcp-redhat }
+    spec:
+      containers:
+        - name: mcp
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "redhat", "--port", "8853"]
+          env:
+            - { name: TELCO_PTP_URL, value: "http://ptp-bridge:7091" }
+          ports: [{ name: http, containerPort: 8853 }]
+          resources:
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-redhat
+spec:
+  selector: { app: mcp-redhat }
+  ports: [{ name: http, port: 8853, targetPort: 8853 }]

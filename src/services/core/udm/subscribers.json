@@ -1,0 +1,16 @@
+[
+  {
+    "supi": "imsi-001010000000001",
+    "k": "465b5ce8b199b49faa5f0a2ee238a6bc",
+    "plmn": "00101",
+    "subscribedNssai": [{"sst": 1}],
+    "status": "ACTIVE"
+  },
+  {
+    "supi": "imsi-001010000000002",
+    "k": "5122250214c33e723a5dd523fc145fc0",
+    "plmn": "00101",
+    "subscribedNssai": [{"sst": 1}, {"sst": 2, "sd": "010203"}],
+    "status": "ACTIVE"
+  }
+]

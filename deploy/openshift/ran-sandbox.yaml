@@ -1,0 +1,86 @@
+# The Cloud RAN AI Sandbox: web console + API. Start/Stop scale ran-slice; Inject/Heal
+# drive ptp-bridge and the O-DU's O1 interface; RCA forwards to nep-orchestrator.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ran-sandbox-controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ran-sandbox-controller
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    resourceNames: ["ran-slice"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ran-sandbox-controller
+subjects:
+  - kind: ServiceAccount
+    name: ran-sandbox-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ran-sandbox-controller
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ran-sandbox-controller
+  labels: { app: ran-sandbox-controller }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ran-sandbox-controller }
+  template:
+    metadata:
+      labels: { app: ran-sandbox-controller }
+    spec:
+      serviceAccountName: ran-sandbox-controller
+      containers:
+        - name: controller
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "services/ran/sandbox_controller.py"]
+          env:
+            - { name: PORT, value: "7098" }
+            - { name: SLICE_DEPLOYMENT, value: "ran-slice" }
+            - { name: SLICE_HOST, value: "ran-slice" }
+            - { name: ODU_URL, value: "http://ran-slice:7010" }
+            - { name: PTP_BRIDGE_URL, value: "http://ptp-bridge:7091" }
+            - { name: NEP_URL, value: "http://nep-orchestrator:7095" }
+          ports: [{ name: http, containerPort: 7098 }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: 7098 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ran-sandbox-controller
+spec:
+  selector: { app: ran-sandbox-controller }
+  ports: [{ name: http, port: 7098, targetPort: 7098 }]
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ran-sandbox
+  annotations:
+    haproxy.router.openshift.io/timeout: 180s   # an LLM-narrated RCA can take > 30s on CPU
+spec:
+  to: { kind: Service, name: ran-sandbox-controller }
+  port: { targetPort: http }
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

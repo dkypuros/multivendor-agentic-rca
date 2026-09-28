@@ -1,0 +1,51 @@
+# NEP orchestrator (rApp-style RCA agent). On /nep/rca/trigger it ingests O1 alarms + PTP state,
+# onboards to CAPIF for a scoped token, fans out to the four MCP planes, runs a deterministic
+# router (no LLM in the decision), optionally asks an LLM to narrate, and emits a TMF688 event.
+#
+# LLM is optional: create the Secret `llm-endpoint` (see docs/deployment.md) with
+# AI_GATEWAY_URL / LLM_MODEL / LLM_API_KEY for any OpenAI-compatible endpoint. Without it the
+# narrative is a labeled deterministic template over the same evidence.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nep-orchestrator
+  labels: { app: nep-orchestrator }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: nep-orchestrator }
+  template:
+    metadata:
+      labels: { app: nep-orchestrator }
+    spec:
+      containers:
+        - name: nep
+          image: mvrca
+          imagePullPolicy: Always
+          command: ["python3", "services/orchestrator/nep_orchestrator.py"]
+          env:
+            - { name: PORT, value: "7095" }
+            - { name: ODU_URL, value: "http://ran-slice:7010" }
+            - { name: PTP_BRIDGE_URL, value: "http://ptp-bridge:7091" }
+            - { name: CAPIF_URL, value: "http://capif:7027" }
+            - { name: MCP_GATEWAY_URL, value: "http://mcp-gateway:8800" }
+            - { name: NIC_FAULT_MODE, value: "follow-ptp" }
+            - name: POD_NAMESPACE
+              valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
+          envFrom:
+            - secretRef: { name: llm-endpoint, optional: true }
+          ports: [{ name: http, containerPort: 7095 }]
+          readinessProbe:
+            httpGet: { path: /nep/health, port: 7095 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 20m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nep-orchestrator
+spec:
+  selector: { app: nep-orchestrator }
+  ports: [{ name: http, port: 7095, targetPort: 7095 }]
