@@ -39,6 +39,10 @@
   svg .hot a:hover rect { stroke: currentColor; stroke-width: 2.5; }
   .hint { font-size: .85em; color: var(--muted); margin-top: 6px; }
   td a, li a { color: inherit; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  h3.t { font-size: 1em; margin: 0 0 6px; font-weight: 600; }
+  table.kv td:first-child { color: var(--muted); white-space: nowrap; }
   nav { position: fixed; right: 16px; bottom: 12px; font-size: .8em; color: var(--muted); }
   @media (max-width: 640px) { body { font-size: 15px; } section { min-height: auto; padding: 40px 0; } nav { display:none; } }
 </style>
@@ -292,6 +296,47 @@
      <code>oc start-build mvrca --from-dir=. --follow</code></p>
   <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. No cluster? <code>python3 <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/tests/e2e_local.py">tests/e2e_local.py</a></code> runs the whole flow on a laptop.</p>
   <p class="muted">Lab only: the console has no login. Share its URL deliberately.</p>
+</section>
+
+<section id="s9">
+  <h2><span class="n">9</span>Reference: the lab</h2>
+  <p class="muted">The single-node OpenShift cluster these demos run on, as inventoried on 29 Sep 2026. For reference only; the demo itself needs far less.</p>
+  <div class="cols">
+    <div>
+      <h3 class="t">Hardware (one server)</h3>
+      <table class="kv">
+        <tr><td>CPU</td><td>2 × Intel Xeon 6767P (Granite Rapids), 256 threads</td></tr>
+        <tr><td>CPU features</td><td>Intel AMX (INT8, BF16, FP16, FP8), SGX, TDX</td></tr>
+        <tr><td>Accelerators</td><td>Intel QAT (8 endpoints), Intel DSA (8 devices)</td></tr>
+        <tr><td>Memory</td><td>about 512 GB</td></tr>
+        <tr><td>Local disk</td><td>about 1.9 TB</td></tr>
+        <tr><td>Network</td><td>Broadcom NetXtreme-E, dual port. <b>No Intel E810</b>, which is why the NIC plane is emulated</td></tr>
+        <tr><td>GPU</td><td>None: LLM inference runs on CPU with AMX</td></tr>
+      </table>
+      <h3 class="t" style="margin-top:18px">Platform</h3>
+      <table class="kv">
+        <tr><td>OpenShift</td><td>4.22.1, single node</td></tr>
+        <tr><td>OS</td><td>RHEL CoreOS 9.8, kernel 5.14.0-687</td></tr>
+        <tr><td>Runtime</td><td>CRI-O 1.35</td></tr>
+        <tr><td>Storage</td><td>NFS (default class), MinIO S3</td></tr>
+        <tr><td>Demo image</td><td>UBI 9 Python 3.12</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 class="t">Used by this demo</h3>
+      <table class="kv">
+        <tr><td>PTP Operator</td><td>4.22 (software-timestamp ptp4l profile)</td></tr>
+        <tr><td>O-Cloud Manager</td><td>4.22.1</td></tr>
+        <tr><td>Topology Aware Lifecycle Manager</td><td>4.22.1</td></tr>
+        <tr><td>Red Hat OpenShift AI</td><td>3.4.0: Llama 3.1 8B Instruct (w8a8) on vLLM for CPU, optional narrator</td></tr>
+        <tr><td>Node Feature Discovery</td><td>4.22</td></tr>
+        <tr><td>Intel Device Plugins Operator</td><td>0.36.0 (SGX, QAT, DSA)</td></tr>
+        <tr><td>Argo CD / GitOps</td><td>optional deploy path</td></tr>
+      </table>
+      <h3 class="t" style="margin-top:18px">Also on the cluster</h3>
+      <p style="font-size:.9em">Advanced Cluster Security 4.11 · Service Mesh 3.4 · Serverless 1.37 · Pipelines 1.23 · Connectivity Link 1.4 · build of Keycloak 26.4 · Quay 3.14 · Streams for Apache Kafka 3.2 · Logging 6.6 + Loki · Tempo 0.22 · build of OpenTelemetry 0.158 · Cluster Observability 1.5 · cert-manager 1.19 · sandboxed containers 1.13 · build of Trustee 1.2 · Intel TDX DCAP 0.1 · Kernel Module Management 2.6</p>
+    </div>
+  </div>
 </section>
 
 </main>
