@@ -29,6 +29,12 @@
   svg .dash { fill: none; stroke: var(--line); stroke-dasharray: 4 3; }
   svg .ln { stroke: currentColor; stroke-width: 1; fill: none; }
   svg .life { stroke: var(--line); stroke-dasharray: 3 3; }
+  .read { margin-top: 18px; padding: 12px 16px; border-left: 3px solid var(--line); background: var(--panel); font-size: .92em; }
+  .read h3 { margin: 0 0 6px; font-size: 1em; font-weight: 600; }
+  .read ul { margin: 0; padding-left: 20px; }
+  svg .rbox { fill: var(--panel); stroke: currentColor; stroke-width: 1.3; }
+  svg .title { font-size: 16px; font-weight: 600; }
+  svg .sub { font-size: 13px; fill: var(--muted); }
   nav { position: fixed; right: 16px; bottom: 12px; font-size: .8em; color: var(--muted); }
   @media (max-width: 640px) { body { font-size: 15px; } section { min-height: auto; padding: 40px 0; } nav { display:none; } }
 </style>
@@ -54,8 +60,58 @@
   <p>Each vendor's tools see only their own layer. The NOC sees "cell unavailable".</p>
 </section>
 
+<section id="s2b">
+  <h2><span class="n">2</span>The idea</h2>
+  <svg viewBox="0 0 900 400" role="img" aria-label="One agent gathers evidence from four vendor planes through CAPIF and an MCP gateway">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+    <rect class="rbox" x="20" y="150" width="200" height="90" rx="8"/>
+    <text class="title" x="120" y="188" text-anchor="middle">NEP agent</text>
+    <text class="sub" x="120" y="210" text-anchor="middle">(RCA orchestrator)</text>
+
+    <rect class="rbox" x="330" y="60" width="160" height="60" rx="8"/>
+    <text class="title" x="410" y="87" text-anchor="middle">CAPIF</text>
+    <text class="sub" x="410" y="106" text-anchor="middle">(scoped token)</text>
+
+    <rect class="rbox" x="330" y="160" width="160" height="70" rx="8"/>
+    <text class="title" x="410" y="191" text-anchor="middle">MCP gateway</text>
+    <text class="sub" x="410" y="211" text-anchor="middle">(checks scope, routes)</text>
+
+    <rect class="rbox" x="620" y="20"  width="260" height="66" rx="8"/>
+    <text class="title" x="750" y="48" text-anchor="middle">O-Cloud plane</text><text class="sub" x="750" y="68" text-anchor="middle">(Red Hat ACM)</text>
+    <rect class="rbox" x="620" y="110" width="260" height="66" rx="8"/>
+    <text class="title" x="750" y="138" text-anchor="middle">RAN plane</text><text class="sub" x="750" y="158" text-anchor="middle">(O-DU over O1)</text>
+    <rect class="rbox" x="620" y="200" width="260" height="66" rx="8"/>
+    <text class="title" x="750" y="228" text-anchor="middle">Timing plane</text><text class="sub" x="750" y="248" text-anchor="middle">(Red Hat PTP)</text>
+    <rect class="rbox" x="620" y="290" width="260" height="66" rx="8" stroke-dasharray="5 4"/>
+    <text class="title" x="750" y="318" text-anchor="middle">NIC plane</text><text class="sub" x="750" y="338" text-anchor="middle">(Intel E810, emulated)</text>
+
+    <g class="ln" stroke-width="1.3">
+      <line x1="220" y1="170" x2="328" y2="100" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <line x1="220" y1="195" x2="328" y2="195" marker-end="url(#ah)"/>
+      <line x1="490" y1="185" x2="618" y2="55"  marker-end="url(#ah)"/>
+      <line x1="490" y1="192" x2="618" y2="143" marker-end="url(#ah)"/>
+      <line x1="490" y1="200" x2="618" y2="233" marker-end="url(#ah)"/>
+      <line x1="490" y1="210" x2="618" y2="322" marker-end="url(#ah)"/>
+    </g>
+    <text class="sub" x="232" y="120">1. get token</text>
+    <text class="sub" x="232" y="187">2. MCP + token</text>
+    <text class="sub" x="410" y="252" text-anchor="middle">3. MCP tool calls →</text>
+    <text class="sub" x="20" y="300">4. a fixed policy decides;</text>
+    <text class="sub" x="20" y="318">   an LLM only explains</text>
+  </svg>
+  <div class="read">
+    <h3>How to read this</h3>
+    <ul>
+      <li><b>Left:</b> one agent, the NEP orchestrator. It owns the investigation, but not the network.</li>
+      <li><b>Middle:</b> the agent first gets a token from CAPIF (3GPP's API exposure framework) that allows only four read-only tools. The MCP gateway checks that token before it forwards any call.</li>
+      <li><b>Right:</b> each box is a different vendor's layer, answering over the same protocol (MCP). The dashed box is emulated: it's shown as evidence but never counted.</li>
+      <li><b>The point:</b> adding a vendor means adding one MCP server behind the gateway, not a new integration in the agent.</li>
+    </ul>
+  </div>
+</section>
+
 <section id="s3">
-  <h2><span class="n">2</span>What we do</h2>
+  <h2><span class="n">3</span>What we do</h2>
   <ol>
     <li><b>Start</b> a RAN slice on demand; a UE attaches with real 5G-AKA and sends traffic.</li>
     <li><b>Inject</b> a timing fault: PTP goes FREERUN, the cell is locked, the O-DU raises an alarm.</li>
@@ -67,49 +123,59 @@
 </section>
 
 <section id="s4">
-  <h2><span class="n">3</span>Block diagram</h2>
+  <h2><span class="n">4</span>Block diagram</h2>
   <svg viewBox="0 0 900 430" role="img" aria-label="Block diagram of the lab components">
-    <rect class="dash" x="10" y="10" width="880" height="410"/>
+    <defs><marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+    <rect class="dash" rx="6" x="10" y="10" width="880" height="410"/>
     <text x="20" y="30" class="sm">OpenShift project multivendor-rca (NetworkPolicy: same namespace only, Route to console)</text>
 
-    <rect class="box" x="30" y="60" width="170" height="54"/><text x="42" y="83">Browser</text><text x="42" y="101" class="sm">SA / presenter</text>
-    <rect class="box" x="30" y="170" width="170" height="64"/><text x="42" y="193">ran-sandbox-controller</text><text x="42" y="211" class="sm">web console, drives the demo</text>
-    <line class="ln" x1="115" y1="114" x2="115" y2="170"/><text x="122" y="146" class="sm">Route</text>
+    <rect class="box" rx="6" x="30" y="60" width="170" height="54"/><text x="42" y="83">Browser</text><text x="42" y="101" class="sm">SA / presenter</text>
+    <rect class="box" rx="6" x="30" y="170" width="170" height="64"/><text x="42" y="193">ran-sandbox-controller</text><text x="42" y="211" class="sm">web console, drives the demo</text>
+    <line class="ln" marker-end="url(#ab)" x1="115" y1="114" x2="115" y2="170"/><text x="122" y="146" class="sm">Route</text>
 
-    <rect class="box" x="30" y="320" width="170" height="70"/><text x="42" y="343">ran-slice (0 or 1 pod)</text><text x="42" y="361" class="sm">32 NFs: 5G core, IMS,</text><text x="42" y="376" class="sm">O-CU-CP/UP, O-DU, O-RU, UE</text>
-    <line class="ln" x1="115" y1="234" x2="115" y2="320"/><text x="122" y="270" class="sm">scale 0↔1, O1 lock/unlock</text>
+    <rect class="box" rx="6" x="30" y="320" width="170" height="70"/><text x="42" y="343">ran-slice (0 or 1 pod)</text><text x="42" y="361" class="sm">32 NFs: 5G core, IMS,</text><text x="42" y="376" class="sm">O-CU-CP/UP, O-DU, O-RU, UE</text>
+    <line class="ln" marker-end="url(#ab)" x1="115" y1="234" x2="115" y2="320"/><text x="122" y="270" class="sm">scale 0↔1, O1 lock/unlock</text>
 
-    <rect class="box" x="270" y="170" width="160" height="64"/><text x="282" y="193">ptp-bridge</text><text x="282" y="211" class="sm">software PTP model</text>
-    <line class="ln" x1="200" y1="195" x2="270" y2="195"/><text x="206" y="187" class="sm">inject / heal</text>
+    <rect class="box" rx="6" x="270" y="170" width="160" height="64"/><text x="282" y="193">ptp-bridge</text><text x="282" y="211" class="sm">software PTP model</text>
+    <line class="ln" marker-end="url(#ab)" x1="200" y1="195" x2="270" y2="195"/><text x="206" y="187" class="sm">inject / heal</text>
 
-    <rect class="box" x="270" y="60" width="160" height="54"/><text x="282" y="83">nep-orchestrator</text><text x="282" y="101" class="sm">RCA agent + policy</text>
-    <line class="ln" x1="200" y1="180" x2="270" y2="100"/><text x="186" y="150" class="sm">run RCA</text>
+    <rect class="box" rx="6" x="270" y="60" width="160" height="54"/><text x="282" y="83">nep-orchestrator</text><text x="282" y="101" class="sm">RCA agent + policy</text>
+    <line class="ln" marker-end="url(#ab)" x1="200" y1="180" x2="270" y2="100"/><text x="186" y="150" class="sm">run RCA</text>
 
-    <rect class="box" x="500" y="60" width="150" height="54"/><text x="512" y="83">capif</text><text x="512" y="101" class="sm">scoped token</text>
-    <line class="ln" x1="430" y1="80" x2="500" y2="80"/>
+    <rect class="box" rx="6" x="500" y="60" width="150" height="54"/><text x="512" y="83">capif</text><text x="512" y="101" class="sm">scoped token</text>
+    <line class="ln" marker-end="url(#ab)" x1="430" y1="80" x2="500" y2="80"/>
 
-    <rect class="box" x="720" y="60" width="150" height="54"/><text x="732" y="83">LLM (optional)</text><text x="732" y="101" class="sm">narrates only</text>
-    <path class="ln" d="M430 70 C 560 30, 650 30, 720 75"/>
+    <rect class="box" rx="6" x="720" y="60" width="150" height="54"/><text x="732" y="83">LLM (optional)</text><text x="732" y="101" class="sm">narrates only</text>
+    <path class="ln" marker-end="url(#ab)" d="M430 70 C 560 30, 650 30, 720 75"/>
 
-    <rect class="box" x="500" y="170" width="150" height="54"/><text x="512" y="193">mcp-gateway</text><text x="512" y="211" class="sm">scope → tool routing</text>
-    <line class="ln" x1="400" y1="114" x2="520" y2="170"/><text x="440" y="150" class="sm">tools/call</text>
+    <rect class="box" rx="6" x="500" y="170" width="150" height="54"/><text x="512" y="193">mcp-gateway</text><text x="512" y="211" class="sm">scope → tool routing</text>
+    <line class="ln" marker-end="url(#ab)" x1="400" y1="114" x2="520" y2="170"/><text x="478" y="132" class="sm">tools/call</text>
 
-    <rect class="box" x="720" y="150" width="150" height="40"/><text x="732" y="175">mcp-ocloud</text>
-    <rect class="box" x="720" y="200" width="150" height="40"/><text x="732" y="225">mcp-ran</text>
-    <rect class="box" x="720" y="250" width="150" height="40"/><text x="732" y="275">mcp-redhat (PTP)</text>
-    <rect class="box" x="720" y="300" width="150" height="40"/><text x="732" y="325">mcp-intel (NIC)</text>
-    <line class="ln" x1="650" y1="197" x2="720" y2="170"/><line class="ln" x1="650" y1="197" x2="720" y2="220"/>
-    <line class="ln" x1="650" y1="197" x2="720" y2="270"/><line class="ln" x1="650" y1="197" x2="720" y2="320"/>
+    <rect class="box" rx="6" x="720" y="150" width="150" height="40"/><text x="732" y="175">mcp-ocloud</text>
+    <rect class="box" rx="6" x="720" y="200" width="150" height="40"/><text x="732" y="225">mcp-ran</text>
+    <rect class="box" rx="6" x="720" y="250" width="150" height="40"/><text x="732" y="275">mcp-redhat (PTP)</text>
+    <rect class="box" rx="6" x="720" y="300" width="150" height="40"/><text x="732" y="325">mcp-intel (NIC)</text>
+    <line class="ln" marker-end="url(#ab)" x1="650" y1="197" x2="720" y2="170"/><line class="ln" marker-end="url(#ab)" x1="650" y1="197" x2="720" y2="220"/>
+    <line class="ln" marker-end="url(#ab)" x1="650" y1="197" x2="720" y2="270"/><line class="ln" marker-end="url(#ab)" x1="650" y1="197" x2="720" y2="320"/>
 
     <text x="720" y="360" class="sm">ocloud: ACM, else "unavailable"</text>
     <text x="720" y="376" class="sm">ran: reads O-DU O1 on ran-slice</text>
     <text x="720" y="392" class="sm">redhat: reads ptp-bridge</text>
     <text x="720" y="408" class="sm">intel: EMULATED, never counted</text>
   </svg>
+  <div class="read">
+    <h3>How to read this</h3>
+    <ul>
+      <li><b>Dashed frame:</b> one OpenShift project. A NetworkPolicy lets pods talk only to each other; the Route to the console is the only way in.</li>
+      <li><b>Left column, top to bottom:</b> the presenter's browser, the console that drives the demo, and the RAN slice it scales between 0 and 1 pods.</li>
+      <li><b>Middle:</b> the console injects and heals timing faults on <code>ptp-bridge</code>, and asks the NEP agent to run an RCA.</li>
+      <li><b>Right:</b> the agent's path: token from CAPIF, tool calls through the gateway, one MCP server per plane, and an optional LLM for the narrative.</li>
+    </ul>
+  </div>
 </section>
 
 <section id="s5">
-  <h2><span class="n">4</span>Sequence (high level)</h2>
+  <h2><span class="n">5</span>Sequence (high level)</h2>
   <svg viewBox="0 0 900 520" role="img" aria-label="High-level sequence of start, inject, RCA, heal, stop">
     <g>
       <text x="40"  y="20">Console</text>
@@ -156,11 +222,19 @@
     <text x="80"  y="445">no fault, 0/3 → NO ACTION</text>
     <text x="80"  y="490">Stop: scale 1→0, resources released</text>
   </svg>
+  <div class="read">
+    <h3>How to read this</h3>
+    <ul>
+      <li><b>Columns</b> are components; time runs downward. Each arrow is a call, labeled with what it does or returns.</li>
+      <li><b>Four phases:</b> Start (a UE attaches), Inject (timing breaks, the cell is locked), RCA (token, tool calls, verdict), then Heal, re-check and Stop.</li>
+      <li><b>Compare the two RCA results:</b> <code>2/3 → HOLD</code> during the fault and <code>0/3 → NO ACTION</code> after heal. The verdict follows the evidence.</li>
+    </ul>
+  </div>
   <p class="muted">Full call-by-call version: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-detailed.pdf">sequence-detailed.pdf</a></p>
 </section>
 
 <section id="s6">
-  <h2><span class="n">5</span>Components and fidelity</h2>
+  <h2><span class="n">6</span>Components and fidelity</h2>
   <table>
     <tr><th>Component</th><th>Role</th><th>How real</th></tr>
     <tr><td>ran-slice</td><td>5G core + O-RAN split RAN, 32 NFs in one pod</td><td>Real protocol logic in Python; no PHY/RF</td></tr>
@@ -176,7 +250,7 @@
 </section>
 
 <section id="s7">
-  <h2><span class="n">6</span>How the decision is made</h2>
+  <h2><span class="n">7</span>How the decision is made</h2>
   <ul>
     <li>Each plane returns evidence plus signals (e.g. <code>ptp_offset_exceeded</code>, <code>du_sync_loss_alarm</code>).</li>
     <li>A fixed route table maps signals to a fault class (e.g. <code>OC-TimingDegraded</code>).</li>
@@ -188,7 +262,7 @@
 </section>
 
 <section id="s8">
-  <h2><span class="n">7</span>Try it</h2>
+  <h2><span class="n">8</span>Try it</h2>
   <p><code>oc new-project multivendor-rca</code><br>
      <code>oc apply -k deploy/openshift</code><br>
      <code>oc start-build mvrca --from-dir=. --follow</code></p>
