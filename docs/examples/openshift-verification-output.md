@@ -8,7 +8,7 @@ Real output of the "is that real?" commands, run against the sandbox on OpenShif
 $ oc project multivendor-rca
 $ oc get pods -l app=ran-slice -o wide
 NAME                        READY   STATUS    RESTARTS   AGE   IP             NODE     NOMINATED NODE   READINESS GATES
-ran-slice-f9f4d6cf6-k6sfk   1/1     Running   0          25m   10.128.1.135   oberon   <none>           <none>
+ran-slice-f9f4d6cf6-k6sfk   1/1     Running   0          25m   10.128.1.135   worker-0 <none>           <none>
 ```
 
 ## The network functions' own log lines
