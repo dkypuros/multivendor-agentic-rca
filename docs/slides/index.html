@@ -35,6 +35,10 @@
   svg .rbox { fill: var(--panel); stroke: currentColor; stroke-width: 1.3; }
   svg .title { font-size: 16px; font-weight: 600; }
   svg .sub { font-size: 13px; fill: var(--muted); }
+  svg .hot rect { fill: transparent; stroke: none; cursor: pointer; }
+  svg .hot a:hover rect { stroke: currentColor; stroke-width: 2.5; }
+  .hint { font-size: .85em; color: var(--muted); margin-top: 6px; }
+  td a, li a { color: inherit; }
   nav { position: fixed; right: 16px; bottom: 12px; font-size: .8em; color: var(--muted); }
   @media (max-width: 640px) { body { font-size: 15px; } section { min-height: auto; padding: 40px 0; } nav { display:none; } }
 </style>
@@ -98,28 +102,32 @@
     <text class="sub" x="410" y="252" text-anchor="middle">3. MCP tool calls →</text>
     <text class="sub" x="20" y="300">4. a fixed policy decides;</text>
     <text class="sub" x="20" y="318">   an LLM only explains</text>
+
+    <g class="hot">
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py"><title>NEP agent code</title><rect x="20" y="150" width="200" height="90" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/core/capif/capif.py"><title>CAPIF code</title><rect x="330" y="60" width="160" height="60" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/gateway.py"><title>MCP gateway code</title><rect x="330" y="160" width="160" height="70" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ocloud_tools.py"><title>O-Cloud plane code</title><rect x="620" y="20" width="260" height="66" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ran_tools.py"><title>RAN plane code</title><rect x="620" y="110" width="260" height="66" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ptp_tools.py"><title>Timing plane code</title><rect x="620" y="200" width="260" height="66" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/nic_tools.py"><title>NIC plane code (emulated)</title><rect x="620" y="290" width="260" height="66" rx="6"/></a>
+    </g>
   </svg>
-  <div class="read">
-    <h3>How to read this</h3>
-    <ul>
-      <li><b>Left:</b> one agent, the NEP orchestrator. It owns the investigation, but not the network.</li>
-      <li><b>Middle:</b> the agent first gets a token from CAPIF (3GPP's API exposure framework) that allows only four read-only tools. The MCP gateway checks that token before it forwards any call.</li>
-      <li><b>Right:</b> each box is a different vendor's layer, answering over the same protocol (MCP). The dashed box is emulated: it's shown as evidence but never counted.</li>
-      <li><b>The point:</b> adding a vendor means adding one MCP server behind the gateway, not a new integration in the agent.</li>
-    </ul>
-  </div>
+  <p class="hint">Click any box to open its code on GitHub.</p>
 </section>
 
 <section id="s3">
-  <h2><span class="n">3</span>What we do</h2>
-  <ol>
-    <li><b>Start</b> a RAN slice on demand; a UE attaches with real 5G-AKA and sends traffic.</li>
-    <li><b>Inject</b> a timing fault: PTP goes FREERUN, the cell is locked, the O-DU raises an alarm.</li>
-    <li><b>Run RCA</b>: an agent gets a scoped CAPIF token, asks four planes for evidence over MCP, and a deterministic policy decides.</li>
-    <li><b>Heal</b> and re-check: the same agent now finds no fault.</li>
-    <li><b>Stop</b>: the slice scales to zero and releases its resources.</li>
-  </ol>
-  <p><b>Key idea:</b> the policy decides, the LLM only explains, and synthetic evidence never counts toward the decision.</p>
+  <h2><span class="n">3</span>Demo flow</h2>
+  <table>
+    <tr><th>Click</th><th>What you see</th><th>Code</th></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#2-start-the-ran-4-minutes">Start RAN Slice</a></td><td>Pod scales 0→1, 32 NFs boot, cell <code>ACTIVE</code>, UE registers (5G-AKA), 3/3 GTP-U echoes</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/deploy/docker/launch_slice.py">launch_slice.py</a>, <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ue_sim/ue_sim.py">ue_sim.py</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#3-break-the-timing-4-minutes">Inject Fault</a></td><td>PTP <code>FREERUN</code> (−50 ms), cell locked over O1, O-DU alarm <code>lossOfRealTimeSynchronization</code></td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/smo/ptp_bridge.py">ptp_bridge.py</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#4-agentic-root-cause-analysis-6-minutes">Run RCA</a></td><td>CAPIF token, 4 MCP tool calls, <code>OC-TimingDegraded</code>, <b>2/3 → HOLD</b>, TMF688 event</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py">nep_orchestrator.py</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#5-heal-and-re-check-2-minutes">Heal Timing</a></td><td>PTP <code>LOCKED</code>, cell <code>ACTIVE</code>, alarm cleared</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ran/sandbox_controller.py">sandbox_controller.py</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#5-heal-and-re-check-2-minutes">Run RCA again</a></td><td><b>0/3 → NO ACTION</b>: the verdict follows the evidence</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/examples/heal-recheck-run.md">example run</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#6-stop-1-minute">Stop RAN Slice</a></td><td>Pod scales 1→0, CPU and memory released</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/openshift/ran-slice.yaml">ran-slice.yaml</a></td></tr>
+  </table>
+  <p class="hint">Full presenter script with talk tracks: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">demo walkthrough</a> (about 20 minutes).</p>
 </section>
 
 <section id="s4">
@@ -162,7 +170,22 @@
     <text x="720" y="376" class="sm">ran: reads O-DU O1 on ran-slice</text>
     <text x="720" y="392" class="sm">redhat: reads ptp-bridge</text>
     <text x="720" y="408" class="sm">intel: EMULATED, never counted</text>
+
+    <g class="hot">
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ran/sandbox_controller.py"><title>Console code</title><rect x="30" y="170" width="170" height="64" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/deploy/docker/launch_slice.py"><title>RAN slice launcher</title><rect x="30" y="320" width="170" height="70" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/smo/ptp_bridge.py"><title>ptp-bridge code</title><rect x="270" y="170" width="160" height="64" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py"><title>NEP agent code</title><rect x="270" y="60" width="160" height="54" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/core/capif/capif.py"><title>CAPIF code</title><rect x="500" y="60" width="150" height="54" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md#optional-connect-an-llm"><title>Connect an LLM</title><rect x="720" y="60" width="150" height="54" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/openshift/gateway-policy.yaml"><title>Gateway policy (scopes)</title><rect x="500" y="170" width="150" height="54" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ocloud_tools.py"><title>O-Cloud plane code</title><rect x="720" y="150" width="150" height="40" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ran_tools.py"><title>RAN plane code</title><rect x="720" y="200" width="150" height="40" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ptp_tools.py"><title>PTP plane code</title><rect x="720" y="250" width="150" height="40" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/nic_tools.py"><title>NIC plane code</title><rect x="720" y="300" width="150" height="40" rx="6"/></a>
+    </g>
   </svg>
+  <p class="hint">Click any box to open its code on GitHub. Manifests: <a href="https://github.com/dkypuros/multivendor-agentic-rca/tree/main/deploy/openshift">deploy/openshift</a>.</p>
   <div class="read">
     <h3>How to read this</h3>
     <ul>
@@ -236,24 +259,25 @@
 <section id="s6">
   <h2><span class="n">6</span>Components and fidelity</h2>
   <table>
-    <tr><th>Component</th><th>Role</th><th>How real</th></tr>
-    <tr><td>ran-slice</td><td>5G core + O-RAN split RAN, 32 NFs in one pod</td><td>Real protocol logic in Python; no PHY/RF</td></tr>
-    <tr><td>ue_sim</td><td>UE attach, PDU session, GTP-U echo</td><td>Real MILENAGE 5G-AKA and NAS flow</td></tr>
-    <tr><td>ptp-bridge</td><td>PTP state and CloudEvents, fault injection</td><td>Software model of ptp4l</td></tr>
-    <tr><td>O-DU alarm</td><td>TS 28.532 alarm over O1</td><td>Raised by the O-DU, after the console's protective lock</td></tr>
-    <tr><td>capif</td><td>TS 29.222 onboarding and scoped token</td><td>Real flow; unsigned lab tokens</td></tr>
-    <tr><td>mcp-gateway</td><td>Scope check, routes tool calls to planes</td><td>Real; not a security boundary</td></tr>
-    <tr><td>NIC plane</td><td>Intel E810 timestamp counters</td><td><b>Emulated</b>, never counted</td></tr>
-    <tr><td>O-Cloud plane</td><td>ACM ManagedCluster health</td><td>Real only with ACM; else "unavailable"</td></tr>
-    <tr><td>nep-orchestrator</td><td>Evidence, policy, TMF688 event</td><td>Deterministic decision; LLM optional</td></tr>
+    <tr><th>Component (code)</th><th>Role</th><th>How real</th></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/deploy/docker/launch_slice.py">ran-slice</a></td><td>5G core + O-RAN split RAN, 32 NFs in one pod</td><td>Real protocol logic in Python; no PHY/RF</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ue_sim/ue_sim.py">ue_sim</a></td><td>UE attach, PDU session, GTP-U echo</td><td>Real MILENAGE 5G-AKA and NAS flow</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/smo/ptp_bridge.py">ptp-bridge</a></td><td>PTP state and CloudEvents, fault injection</td><td>Software model of ptp4l</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ran/odu/odu.py">O-DU alarm</a></td><td>TS 28.532 alarm over O1</td><td>Raised by the O-DU, after the console's protective lock</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/core/capif/capif.py">capif</a></td><td>TS 29.222 onboarding and scoped token</td><td>Real flow; unsigned lab tokens</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/gateway.py">mcp-gateway</a></td><td>Scope check, routes tool calls to planes</td><td>Real; not a security boundary</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/nic_tools.py">NIC plane</a></td><td>Intel E810 timestamp counters</td><td><b>Emulated</b>, never counted</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ocloud_tools.py">O-Cloud plane</a></td><td>ACM ManagedCluster health</td><td>Real only with ACM; else "unavailable" (<a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md#optional-o-cloud-plane-with-acm">how</a>)</td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py">nep-orchestrator</a></td><td>Evidence, policy, TMF688 event</td><td>Deterministic decision; LLM optional (<a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md#optional-connect-an-llm">how</a>)</td></tr>
   </table>
+  <p class="hint">More: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/architecture.md#components">architecture</a> · <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/reference.md">APIs, config and ports</a> · <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md">deployment</a> · <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md#security-notes">security notes</a></p>
 </section>
 
 <section id="s7">
   <h2><span class="n">7</span>How the decision is made</h2>
   <ul>
     <li>Each plane returns evidence plus signals (e.g. <code>ptp_offset_exceeded</code>, <code>du_sync_loss_alarm</code>).</li>
-    <li>A fixed route table maps signals to a fault class (e.g. <code>OC-TimingDegraded</code>).</li>
+    <li>A fixed <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py#L37">route table</a> maps signals to a fault class (e.g. <code>OC-TimingDegraded</code>).</li>
     <li>Corroboration counts <b>real</b> planes only. The bar is 3.</li>
     <li>Verdicts: <code>APPLY (auto-eligible)</code>, <code>HOLD</code> (needs a human), <code>NO ACTION</code>.</li>
     <li>In the demo: RAN + PTP agree, NIC is emulated → <b>2/3 → HOLD</b>. Nothing runs automatically.</li>
@@ -264,9 +288,9 @@
 <section id="s8">
   <h2><span class="n">8</span>Try it</h2>
   <p><code>oc new-project multivendor-rca</code><br>
-     <code>oc apply -k deploy/openshift</code><br>
+     <code>oc apply -k <a href="https://github.com/dkypuros/multivendor-agentic-rca/tree/main/deploy/openshift">deploy/openshift</a></code><br>
      <code>oc start-build mvrca --from-dir=. --follow</code></p>
-  <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. No cluster? <code>python3 tests/e2e_local.py</code> runs the whole flow on a laptop.</p>
+  <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. No cluster? <code>python3 <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/tests/e2e_local.py">tests/e2e_local.py</a></code> runs the whole flow on a laptop.</p>
   <p class="muted">Lab only: the console has no login. Share its URL deliberately.</p>
 </section>
 
