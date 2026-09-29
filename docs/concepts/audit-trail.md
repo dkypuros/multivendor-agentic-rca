@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#output) · [All concepts](README.md)
 
+**Official definition:** [TM Forum TMF688 Event Management API](https://github.com/tmforum-apis/TMF688-Event), [OpenTelemetry traces and spans](https://opentelemetry.io/docs/concepts/signals/traces/)
+
 ## What it is
 
 Every RCA leaves a record of what it did and why: a **trace** of six timed steps (**spans**), and a result event in **TM Forum TMF688** format (the Event Management API), so other OSS/BSS tools could consume it.

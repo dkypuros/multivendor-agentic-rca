@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#authorization) · [All concepts](README.md)
 
+**Official definition:** [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm)
+
 ## What it is
 
 CAPIF (Common API Framework, 3GPP TS 29.222) is 3GPP's standard way to expose network APIs: providers **publish** APIs, callers **onboard** as invokers, and CAPIF issues each invoker an access token **scoped** to the APIs it may call.

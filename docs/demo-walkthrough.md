@@ -25,7 +25,7 @@ The console starts at **RAN STOPPED (IDLE)**, PTP `LOCKED`, and cell `OFFLINE (s
 Tips: Worth mentioning on the UI:
 - the **log stream** on the left, merging the console's own actions with the RAN pod's real stdout
 - the **controls**
-- **UE**, **PTP timing plane** and **O-DU faults (O1)** panels, each labeled with the endpoint it reads
+- **UE**, **PTP timing plane** and **[O-DU](glossary.md#o-du) faults ([O1](glossary.md#o1))** panels, each labeled with the endpoint it reads
 - **NEP Agentic RCA**
 
 ## 2. Start the RAN (4 minutes)
@@ -43,7 +43,7 @@ Tips: Worth mentioning on the UI:
 - Panels: UE `REGISTERED imsi-001010000000001` / `10.45.0.x` / `3/3`; cell `ACTIVE`; RF carrier `Active (oru-1, 1 UE)`; pill `RAN RUNNING & LOCKED`.
 
 **Talk track:**
-> "That button scaled a Kubernetes Deployment from zero to one. The pod runs a 5G core and an O-RAN split RAN: CU control plane, CU user plane, DU and RU. When the DU reported its cell active over O1, a UE simulator attached through it. The authentication is real 5G-AKA; the UE and the UDM compute MILENAGE independently. The echoes crossed the GTP-U tunnel through the CU-UP and UPF. When we're done, Stop scales it back to zero, so a shared lab doesn't pay for an idle RAN."
+> "That button scaled a Kubernetes Deployment from zero to one. The pod runs a 5G core and an O-RAN split RAN: CU control plane, CU user plane, DU and RU. When the DU reported its cell active over O1, a UE simulator attached through it. The authentication is real [5G-AKA](glossary.md#5g-aka); the UE and the UDM compute [MILENAGE](glossary.md#milenage) independently. The echoes crossed the [GTP-U](glossary.md#gtp-u-echo) tunnel through the CU-UP and UPF. When we're done, Stop scales it back to zero, so a shared lab doesn't pay for an idle RAN."
 
 **If asked "is this OpenAirInterface?"**: No. It's a standards-shaped software RAN and core written in Python: protocol logic without a PHY or RF. The evidence-gathering pattern is the same one you'd point at OAI or a commercial DU through their O1 interfaces.
 
@@ -60,7 +60,7 @@ Tips: Worth mentioning on the UI:
 - Pill: `FAULT: CELL UNAVAILABLE`
 
 **Talk track:**
-> "We made the grandmaster clock jump by 50 milliseconds. A TDD cell needs to stay within about 1.5 microseconds, so this is 30,000 times over budget. The timing plane went to FREERUN, and the DU's protective action was applied: the cell is locked so it won't transmit out of sync and interfere with neighbors. The alarm you see comes from the DU's own fault management: 3GPP TS 28.532, probable cause loss of real-time synchronization. To a traditional NOC this is just 'cell unavailable'."
+> "We made the grandmaster clock jump by 50 milliseconds. A TDD cell needs to stay within about 1.5 microseconds, so this is 30,000 times over budget. The timing plane went to [FREERUN](glossary.md#ptp-lock-state), and the DU's protective action was applied: the cell is locked so it won't transmit out of sync and interfere with neighbors. The alarm you see comes from the DU's own fault management: 3GPP [TS 28.532](glossary.md#ts-28-532-alarm), probable cause loss of real-time synchronization. To a traditional NOC this is just 'cell unavailable'."
 
 **Be precise:**
 - This software O-DU has no PTP servo, so the **console** applies the protective lock over the O-DU's standard O1 interface as part of Inject Fault. The O-DU then raises the alarm itself. In other words, the DU-side symptoms follow from the injection by design; only the PTP plane observes the timing fault directly.
@@ -73,8 +73,8 @@ Tips: Worth mentioning on the UI:
 **What appears:** the audit-trail panel opens, headed by a Trace ID and Run ID (identifiers of this run; traces live in the orchestrator's memory, not in MLflow).
 - **Hierarchical execution spans:**
   1. `O-RAN.O1.FM.Alarm_Ingest`: DU alarms plus PTP state
-  2. `3GPP.CAPIF.Security_Authz`: the agent onboards to CAPIF and gets a token scoped to `3gpp#mcp-aef:mcp-tools` (first RCA; later runs reuse the token until it expires, `capif.tokenSource: cached`)
-  3. `O-RAN.R1.MCP_Tool_Execution`: four tool calls through the MCP gateway
+  2. `3GPP.CAPIF.Security_Authz`: the agent onboards to [CAPIF](glossary.md#capif) and gets a token scoped to `3gpp#mcp-aef:mcp-tools` (first RCA; later runs reuse the token until it expires, `capif.tokenSource: cached`)
+  3. `O-RAN.R1.MCP_Tool_Execution`: four tool calls through the [MCP](glossary.md#mcp) gateway
   4. `O-RAN.NonRT_RIC.Deterministic_Router`: the decision
   5. `Enterprise.AI.LLM_Synthesis`: the narrative
   6. `TMForum.TMF688.Audit_Event_Emission`
@@ -91,7 +91,7 @@ Tips: Worth mentioning on the UI:
 - **Narrative:** with an LLM, the model's explanation plus its model id and latency. Without one, `[template - LLM unavailable] …` over the same evidence.
 
 **Talk track:**
-> "The agent doesn't get free rein. It onboarded through CAPIF, the 3GPP exposure framework, and received a token scoped to exactly the four read-only evidence tools; the MCP gateway checks that scope before routing each call to a plane-specific server. Every plane points at timing: the PTP offset, the DU's loss-of-sync alarm, and the NIC's hardware-timestamp counters. But the NIC here is emulated, and the policy refuses to let synthetic evidence push a decision over the bar. So we have two real corroborating planes against a bar of three: the verdict is HOLD, and a human has to approve any remediation. The routing table is deterministic. The LLM never makes that decision; it only explains evidence that's already in the audit record, and the whole thing is emitted as a TM Forum TMF688 event."
+> "The agent doesn't get free rein. It onboarded through CAPIF, the 3GPP exposure framework, and received a token scoped to exactly the four read-only evidence tools; the MCP gateway checks that scope before routing each call to a plane-specific server. Every plane points at timing: the PTP offset, the DU's loss-of-sync alarm, and the NIC's hardware-timestamp counters. But the NIC here is emulated, and the policy refuses to let synthetic evidence push a decision over the bar. So we have two real corroborating planes against a bar of three: the verdict is HOLD, and a human has to approve any remediation. The routing table is deterministic. The LLM never makes that decision; it only explains evidence that's already in the audit record, and the whole thing is emitted as a TM Forum [TMF688](glossary.md#tmf688-rcaconcludedevent) event."
 
 **Be precise:**
 - The **NIC plane is emulated**: its response carries `emulated: true`, it reports the fault only while PTP is actually unlocked, and it **never counts** toward the bar.

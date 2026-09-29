@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#tools) · [All concepts](README.md)
 
+**Official definition:** [Model Context Protocol](https://modelcontextprotocol.io/), [JSON-RPC 2.0](https://www.jsonrpc.org/specification)
+
 ## What it is
 
 **MCP** (Model Context Protocol) is an open standard for how an AI agent discovers and calls tools. A server lists its tools (`tools/list`), and the agent calls one by name with arguments (`tools/call`), over JSON-RPC.

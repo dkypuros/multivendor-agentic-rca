@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#timing) · [All concepts](README.md)
 
+**Official definition:** [IEEE 1588 (PTP)](https://standards.ieee.org/ieee/1588/6825/), [linuxptp](https://linuxptp.nwtime.org/), [CloudEvents](https://cloudevents.io/)
+
 ## What it is
 
 A 5G TDD cell transmits and receives on a shared schedule, so every radio must agree on time to within about 1.5 microseconds. They get that time from **PTP** (Precision Time Protocol): a grandmaster clock, and a servo (`ptp4l`) on each server that stays **LOCKED** to it. If a clock loses sync it goes **FREERUN**, and the cell must stop transmitting before it interferes with its neighbors.

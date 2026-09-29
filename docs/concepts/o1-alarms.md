@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#ran-o-ran-split) · [All concepts](README.md)
 
+**Official definition:** [3GPP TS 28.532](https://www.3gpp.org/DynaReport/28532.htm)
+
 ## What it is
 
 3GPP TS 28.532 defines how a network function reports faults to management systems: each active alarm has a name, a **probable cause**, a severity and the managed object it affects. For O-RAN units these alarms are read over **O1**. They are what a NOC normally sees first: "cell unavailable".

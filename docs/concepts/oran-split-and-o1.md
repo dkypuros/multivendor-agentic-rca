@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#ran-o-ran-split) · [All concepts](README.md)
 
+**Official definition:** [O-RAN Alliance specifications](https://www.o-ran.org/specifications), [3GPP TS 38.401](https://www.3gpp.org/DynaReport/38401.htm) (NG-RAN architecture), [3GPP TS 28.541](https://www.3gpp.org/DynaReport/28541.htm) (administrativeState)
+
 ## What it is
 
 O-RAN splits a base station into separate units from potentially different vendors, connected by open interfaces:

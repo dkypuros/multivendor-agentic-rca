@@ -2,6 +2,8 @@
 
 [Glossary](../glossary.md#ue-and-attach) · [All concepts](README.md)
 
+**Official definition:** [3GPP TS 38.331](https://www.3gpp.org/DynaReport/38331.htm) (RRC), [TS 24.501](https://www.3gpp.org/DynaReport/24501.htm) (NAS), [TS 33.501](https://www.3gpp.org/DynaReport/33501.htm) (5G-AKA), [TS 35.206](https://www.3gpp.org/DynaReport/35206.htm) (MILENAGE), [TS 29.281](https://www.3gpp.org/DynaReport/29281.htm) (GTP-U)
+
 ## What it is
 
 Before a phone (a **UE**) can send data on a 5G network it has to:
