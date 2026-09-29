@@ -43,6 +43,7 @@
   @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
   h3.t { font-size: 1em; margin: 0 0 6px; font-weight: 600; }
   table.kv td:first-child { color: var(--muted); white-space: nowrap; }
+  pre { font: .85em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--panel); padding: 10px 12px; overflow-x: auto; margin: 0 0 14px; }
   nav { position: fixed; right: 16px; bottom: 12px; font-size: .8em; color: var(--muted); }
   @media (max-width: 640px) { body { font-size: 15px; } section { min-height: auto; padding: 40px 0; } nav { display:none; } }
 </style>
@@ -291,10 +292,22 @@
 
 <section id="s8">
   <h2><span class="n">8</span>Try it</h2>
-  <p><code>oc new-project multivendor-rca</code><br>
-     <code>oc apply -k <a href="https://github.com/dkypuros/multivendor-agentic-rca/tree/main/deploy/openshift">deploy/openshift</a></code><br>
-     <code>oc start-build mvrca --from-dir=. --follow</code></p>
-  <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. No cluster? <code>python3 <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/tests/e2e_local.py">tests/e2e_local.py</a></code> runs the whole flow on a laptop.</p>
+  <p>You need an OpenShift 4.x cluster, <code>oc</code> logged in, and <code>git</code>. Repo: <a href="https://github.com/dkypuros/multivendor-agentic-rca">github.com/dkypuros/multivendor-agentic-rca</a></p>
+  <h3 class="t">1. Get the code</h3>
+  <pre>git clone https://github.com/dkypuros/multivendor-agentic-rca.git
+cd multivendor-agentic-rca</pre>
+  <h3 class="t">2. Deploy (run from the repo folder)</h3>
+  <pre>oc new-project multivendor-rca
+oc apply -k deploy/openshift                   # Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
+oc start-build mvrca --from-dir=. --follow     # builds the image from your local clone
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca</pre>
+  <h3 class="t">3. Open the console and check it</h3>
+  <pre>oc get route ran-sandbox -o jsonpath='https://{.spec.host}{"\n"}'
+python3 tests/smoke_route.py https://$(oc get route ran-sandbox -o jsonpath='{.spec.host}')   # ALL GREEN</pre>
+  <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. Details and troubleshooting: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md">deployment guide</a>.</p>
+  <h3 class="t">No cluster?</h3>
+  <pre>pip install pyyaml
+python3 tests/e2e_local.py                     # runs Start / Inject / RCA / Heal / Stop on a laptop</pre>
   <p class="muted">Lab only: the console has no login. Share its URL deliberately.</p>
 </section>
 
