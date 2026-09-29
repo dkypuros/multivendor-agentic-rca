@@ -73,6 +73,9 @@ oc rollout restart deployment/nep-orchestrator
 | [docs/demo-walkthrough.md](docs/demo-walkthrough.md) | A 20-minute presenter script: what to click, what appears, what to say |
 | [docs/architecture.md](docs/architecture.md) | Components, call flows, the RCA pipeline, design decisions |
 | [docs/reference.md](docs/reference.md) | HTTP APIs, configuration (env vars), ports |
+| [docs/glossary.md](docs/glossary.md) | Every term that runs in the demo, what it does here, and where it is in the code |
+| [docs/concepts/](docs/concepts/README.md) | Deeper pages: O-RAN and O1, UE attach, timing fault, O1 alarms, CAPIF, MCP gateway, the decision, the audit trail |
+| [Slides](https://dkypuros.github.io/multivendor-agentic-rca/) | A short overview deck (GitHub Pages) |
 
 ## Try it without a cluster
 

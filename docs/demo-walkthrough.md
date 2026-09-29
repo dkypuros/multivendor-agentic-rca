@@ -1,5 +1,7 @@
 # Demo walkthrough: 20 minutes
 
+New to a term? See the [glossary](glossary.md); the [concept pages](concepts/README.md) go deeper on the ones customers ask about.
+
 A presenter script for the Cloud RAN AI Sandbox. Each step says **what to click**, **what appears**, and **what to say**. Everything on screen comes from a running component, so you can back up any claim with `oc`.
 
 **The story:** a cell goes down in a multivendor network. The RAN comes from one vendor, the cloud platform from another, the timing from a third, and the NIC silicon from a fourth. Whose fault is it? An agent gathers testimony from every plane, a deterministic policy decides, and an LLM only explains the decision.

@@ -337,16 +337,12 @@ python3 tests/e2e_local.py                     # runs Start / Inject / RCA / Hea
     <div>
       <h3 class="t">Used by this demo</h3>
       <table class="kv">
-        <tr><td>PTP Operator</td><td>4.22 (software-timestamp ptp4l profile)</td></tr>
-        <tr><td>O-Cloud Manager</td><td>4.22.1</td></tr>
-        <tr><td>Topology Aware Lifecycle Manager</td><td>4.22.1</td></tr>
-        <tr><td>Red Hat OpenShift AI</td><td>3.4.0: Llama 3.1 8B Instruct (w8a8) on vLLM for CPU, optional narrator</td></tr>
-        <tr><td>Node Feature Discovery</td><td>4.22</td></tr>
-        <tr><td>Intel Device Plugins Operator</td><td>0.36.0 (SGX, QAT, DSA)</td></tr>
-        <tr><td>Argo CD / GitOps</td><td>optional deploy path</td></tr>
+        <tr><td>OpenShift</td><td>4.22.1: runs every component (Deployments, Route, NetworkPolicy, builds)</td></tr>
+        <tr><td>Red Hat OpenShift AI</td><td>3.4.0: Llama 3.1 8B Instruct (w8a8) on vLLM for CPU. Optional LLM narrator, off by default</td></tr>
       </table>
-      <h3 class="t" style="margin-top:18px">Also on the cluster</h3>
-      <p style="font-size:.9em">Advanced Cluster Security 4.11 · Service Mesh 3.4 · Serverless 1.37 · Pipelines 1.23 · Connectivity Link 1.4 · build of Keycloak 26.4 · Quay 3.14 · Streams for Apache Kafka 3.2 · Logging 6.6 + Loki · Tempo 0.22 · build of OpenTelemetry 0.158 · Cluster Observability 1.5 · cert-manager 1.19 · sandboxed containers 1.13 · build of Trustee 1.2 · Intel TDX DCAP 0.1 · Kernel Module Management 2.6</p>
+      <p class="hint">Timing comes from the demo's own software PTP model, not the PTP Operator. See the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/glossary.md#not-in-this-demo">glossary</a>.</p>
+      <h3 class="t" style="margin-top:18px">On the lab cluster (not used by the demo)</h3>
+      <p style="font-size:.9em">PTP Operator 4.22 · O-Cloud Manager 4.22.1 · Topology Aware Lifecycle Manager 4.22.1 · Node Feature Discovery 4.22 · Intel Device Plugins 0.36 · Argo CD 0.18 · Advanced Cluster Security 4.11 · Service Mesh 3.4 · Serverless 1.37 · Pipelines 1.23 · Connectivity Link 1.4 · build of Keycloak 26.4 · Quay 3.14 · Streams for Apache Kafka 3.2 · Logging 6.6 + Loki · Tempo 0.22 · build of OpenTelemetry 0.158 · Cluster Observability 1.5 · cert-manager 1.19 · sandboxed containers 1.13 · build of Trustee 1.2 · Intel TDX DCAP 0.1 · Kernel Module Management 2.6</p>
     </div>
   </div>
 </section>
