@@ -17,10 +17,10 @@ The console starts at **RAN STOPPED (IDLE)**, PTP `LOCKED`, and cell `OFFLINE (s
 
 ## 1. Framing (2 minutes)
 
-**Say:**
+**Talk track:**
 > "A cell is unavailable. In a multivendor RAN that single symptom can come from the radio stack, the cloud platform, the timing network or the NIC firmware. Each vendor's tools only see their own layer. Today we'll run a live RAN on OpenShift, break its timing, and let an agent collect evidence from every layer through one governed interface, with a policy engine that decides and an LLM that only explains."
 
-Point at the page layout:
+Tips: Worth mentioning on the UI:
 - the **log stream** on the left, merging the console's own actions with the RAN pod's real stdout
 - the **controls**
 - **UE**, **PTP timing plane** and **O-DU faults (O1)** panels, each labeled with the endpoint it reads
@@ -30,7 +30,7 @@ Point at the page layout:
 
 **Click** **Start RAN Slice**.
 
-**What appears:**
+**What you should see:**
 - The pill turns amber: `STARTING...`.
 - `K8S: PATCH deployments/ran-slice/scale replicas=1`, then pod `Pending`, then `Running`. In the OpenShift tab a `ran-slice-…` pod appears.
 - `launch_slice: READY nf=nrf …`, then the other 31 functions in dependency tiers (UDM and friends, then AMF, …, the O-DU, and finally the O-RU, SMF and UPF), each gated `READY`, ending with `boot status=done ready=32`.
@@ -40,7 +40,7 @@ Point at the page layout:
 - Interleaved lines from the pod itself: `amf: registration_accepted`, `smf: session_created`, `amf: pdu_session_established`.
 - Panels: UE `REGISTERED imsi-001010000000001` / `10.45.0.x` / `3/3`; cell `ACTIVE`; RF carrier `Active (oru-1, 1 UE)`; pill `RAN RUNNING & LOCKED`.
 
-**Say:**
+**Talk track:**
 > "That button scaled a Kubernetes Deployment from zero to one. The pod runs a 5G core and an O-RAN split RAN: CU control plane, CU user plane, DU and RU. When the DU reported its cell active over O1, a UE simulator attached through it. The authentication is real 5G-AKA; the UE and the UDM compute MILENAGE independently. The echoes crossed the GTP-U tunnel through the CU-UP and UPF. When we're done, Stop scales it back to zero, so a shared lab doesn't pay for an idle RAN."
 
 **If asked "is this OpenAirInterface?"**: No. It's a standards-shaped software RAN and core written in Python: protocol logic without a PHY or RF. The evidence-gathering pattern is the same one you'd point at OAI or a commercial DU through their O1 interfaces.
@@ -57,7 +57,7 @@ Point at the page layout:
 - O-DU panel: cell `UNAVAILABLE`, alarm `CellUnavailable (lossOfRealTimeSynchronization)`, RF carrier `Off (…admin LOCKED)`
 - Pill: `FAULT: CELL UNAVAILABLE`
 
-**Say:**
+**Talk track:**
 > "We made the grandmaster clock jump by 50 milliseconds. A TDD cell needs to stay within about 1.5 microseconds, so this is 30,000 times over budget. The timing plane went to FREERUN, and the DU's protective action was applied: the cell is locked so it won't transmit out of sync and interfere with neighbors. The alarm you see comes from the DU's own fault management: 3GPP TS 28.532, probable cause loss of real-time synchronization. To a traditional NOC this is just 'cell unavailable'."
 
 **Be precise:**
@@ -88,7 +88,7 @@ Point at the page layout:
 - **Decision:** `faultClass: OC-TimingDegraded`, `corroboration: 2/3`, `decision: HOLD — below the bar, needs human approval`. The router span lists `policy.corroboratingPlanes: [platform, ran]` and `policy.emulatedPlanesNotCounted: [hardware]`.
 - **Narrative:** with an LLM, the model's explanation plus its model id and latency. Without one, `[template - LLM unavailable] …` over the same evidence.
 
-**Say:**
+**Talk track:**
 > "The agent doesn't get free rein. It onboarded through CAPIF, the 3GPP exposure framework, and received a token scoped to exactly the four read-only evidence tools; the MCP gateway checks that scope before routing each call to a plane-specific server. Every plane points at timing: the PTP offset, the DU's loss-of-sync alarm, and the NIC's hardware-timestamp counters. But the NIC here is emulated, and the policy refuses to let synthetic evidence push a decision over the bar. So we have two real corroborating planes against a bar of three: the verdict is HOLD, and a human has to approve any remediation. The routing table is deterministic. The LLM never makes that decision; it only explains evidence that's already in the audit record, and the whole thing is emitted as a TM Forum TMF688 event."
 
 **Be precise:**
@@ -116,12 +116,17 @@ See a [real example run](examples/heal-recheck-run.md) of inject, RCA, heal and 
 **Close:**
 > "One click brought up a RAN and core, a UE proved the user plane, a timing fault took the cell down, and a governed agent gathered multivendor evidence, decided by policy (and held back, because not enough of that evidence was real), explained with an LLM, and left an audit trail. Then we gave the resources back."
 
-## Back-pocket proof (if someone asks "is that real?")
+## OpenShift verification and validation steps: (if someone asks "is that real?")
+
+Run these while the RAN slice is running (after Stop there's no pod to read logs from).
 
 ```bash
+oc project multivendor-rca                                    # or the project you deployed into
 oc get pods -l app=ran-slice -o wide                          # the pod the Start button created
 oc logs deploy/ran-slice | grep -E 'registration_accepted|session_created|o1_config_applied'
 oc exec deploy/nep-orchestrator -- python3 -c "import urllib.request,json; \
   print(json.dumps(json.load(urllib.request.urlopen('http://127.0.0.1:7095/nep/audit/latest'))['tmf688Event'], indent=1))"
 oc get deploy ran-slice -o jsonpath='{.spec.replicas}'          # 1 while running, 0 after Stop
 ```
+
+See [example output](examples/openshift-verification-output.md) of these commands from a real run.
