@@ -1,16 +1,12 @@
-"""Agentic closed loop over the real Sheldon O-Cloud.
+"""Agentic RCA surface used by multivendor-agentic-rca.
 
-The O-Cloud itself (deploy/sheldon/, extensions/sheldon/o2ims_reconciler.py) already
-provisions bare metal from an O-RAN O2-IMS ProvisioningRequest. This package adds the
-GOVERNANCE around that capability — the part that decides whether an action may run at
-all, and leaves an auditable account of why it did.
-
-  ocloud_tools.py  the typed tool surface: the ONLY code that reads or writes the O-Cloud
-  guardrail.py     the LLM-free layer that says no (allowlist, sandbox gate, blast caps)
-  trust.py         the licence ledger: promotion is earned, demotion is automatic
-  mcp_server.py    exposes the tool surface over MCP so a vendor's agent can testify
-  loop.py          the closed loop: testimony -> route -> rehearse -> guard -> act -> audit
-
-Declarative contracts live in harness/sheldon/ (taxonomy, guardrails, trust registry,
-JSON schemas) so the behaviour is readable without reading the code.
+  gateway.py      MCP gateway: CAPIF bearer token -> tool scope -> route to a plane server
+  mcp_http.py     serves one plane's MCP server over HTTP (--server ocloud|ran|intel|redhat)
+  mcp_core.py     shared JSON-RPC/MCP handler
+  mcp_server.py   O-Cloud plane (ocloud_tools.py: OCM/ACM ManagedClusters via kubectl)
+  mcp_ran.py      RAN plane (ran_tools.py: O-DU O1 status + alarms)
+  mcp_redhat.py   PTP plane (ptp_tools.py: ptp-bridge)
+  mcp_intel.py    NIC plane (nic_tools.py: EMULATED Intel E810 counters)
+  guardrail.py, trust.py   upstream action-governance layer; its policy files (harness/sheldon/)
+                           are not shipped, so the O-Cloud *action* tools refuse to run here.
 """

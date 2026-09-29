@@ -13,15 +13,24 @@ spec:
     metadata:
       labels: { app: capif }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: capif
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "services/core/capif/capif.py"]
           env:
             - { name: TELCO_BIND, value: "0.0.0.0" }
             - { name: TELCO_PORT_OFFSET, value: "0" }
           ports: [{ name: http, containerPort: 7027 }]
+          readinessProbe:
+            tcpSocket: { port: 7027 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 48Mi }
             limits: { cpu: 200m, memory: 128Mi }

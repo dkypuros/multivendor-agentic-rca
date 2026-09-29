@@ -8,8 +8,9 @@ the sandbox HTTP API exactly like the browser does and checks what comes back:
 
   start -> UE registered + PDU session + 3/3 GTP-U echoes, cell ACTIVE
   inject -> PTP FREERUN, O-DU cell UNAVAILABLE + CellUnavailable alarm
-  RCA    -> OC-TimingDegraded corroborated by the RAN, PTP and (emulated) NIC planes
-  heal   -> cell ACTIVE, alarm cleared, PTP LOCKED; RCA finds no fault
+  RCA    -> OC-TimingDegraded; RAN + PTP planes corroborate (2/3), the emulated NIC agrees but is
+            not counted -> HOLD; CAPIF token issued once and reused
+  heal   -> cell ACTIVE, alarm cleared, PTP LOCKED; RCA finds no fault -> NO ACTION
   stop   -> slice gone
 
 Needs python3 >= 3.11 and PyYAML (the MCP gateway reads its policy with it).
@@ -156,13 +157,18 @@ def main():
     check("RAN plane testifies from O-DU O1 alarm", "du_sync_loss_alarm" in planes["ran"]["signals"],
           planes["ran"]["evidence"])
     check("PTP plane reports offset exceeded", "ptp_offset_exceeded" in planes["platform"]["signals"])
-    check("NIC plane answers (emulated)", planes["hardware"]["emulated"] and planes["hardware"]["signals"])
+    check("NIC plane answers, labeled emulated", planes["hardware"]["emulated"] and planes["hardware"]["signals"])
     cluster = planes["cluster"]
     check("O-Cloud plane reports what it saw (no ACM here), nothing invented",
           not cluster["signals"] and ("unavailable" in cluster["evidence"] or "no OCM/ACM" in cluster["evidence"]),
           cluster["evidence"][:70])
+    router = next(sp for sp in rca["spans"] if sp["spanId"] == "span-4-deterministic-router")["attributes"]
     check("diagnosis OC-TimingDegraded", ev.get("faultClass") == "OC-TimingDegraded", ev.get("faultClass"))
-    check("corroboration 3/3 -> APPLY", ev.get("corroboration") == "3/3", ev.get("decision"))
+    check("emulated NIC not counted: 2/3 real planes -> HOLD",
+          ev.get("corroboration") == "2/3" and ev.get("decision", "").startswith("HOLD")
+          and router["policy.emulatedPlanesNotCounted"] == ["hardware"],
+          f"{ev.get('corroboration')} {ev.get('decision')}")
+    check("reply is this run's own trace", rca.get("traceId") == ev.get("traceId"))
     check("LLM narrative labeled as template when no LLM",
           rca["llmSynthesis"]["model"].startswith("none"), rca["llmSynthesis"]["summary"][:60])
 
@@ -173,14 +179,18 @@ def main():
     check("PTP LOCKED", s["ptp"]["port_state"] == "LOCKED")
     check("cell ACTIVE, alarm cleared", s["o1"]["cellState"] == "ACTIVE" and not s["alarms"])
     rca = http("POST", SANDBOX + "/api/ran/trigger-rca")
-    check("RCA after heal finds no fault", rca["tmf688Event"]["event"]["faultClass"] is None,
-          rca["tmf688Event"]["event"]["corroboration"])
+    ev = rca["tmf688Event"]["event"]
+    check("RCA after heal: no fault -> NO ACTION", ev["faultClass"] is None and ev["decision"].startswith("NO ACTION"),
+          ev["decision"])
+    capif = next(sp for sp in rca["spans"] if sp["spanId"] == "span-2-capif-authz")["attributes"]
+    check("CAPIF token reused on the second RCA (no re-onboarding)", capif.get("capif.tokenSource") == "cached")
 
     print("logs:")
     logs = http("GET", SANDBOX + "/api/ran/logs")
     sources = {l["source"] for l in logs}
     check("log stream carries controller + UE + real NF lines", {"K8S", "UE-SIM", "amf", "odu"} <= sources,
           ",".join(sorted(sources))[:80])
+    check("no perception_emit_failed noise", not any("perception_emit_failed" in l["message"] for l in logs))
 
     print("stop:")
     http("POST", SANDBOX + "/api/ran/stop")

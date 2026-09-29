@@ -48,6 +48,10 @@ def emit(event, cell_id=None, kpis=None, severity=None, alarm_condition=None, **
     everything in **attributes rides along as VES additionalFields and stays readable
     in the stored record's source_event without pretending to be a measurement.
     """
+    if not os.environ.get("SMO_BRIDGE_URL"):
+        # [multivendor-agentic-rca] no SMO perception bridge ships with this repo: emitting is
+        # opt-in (set SMO_BRIDGE_URL), so the RAN log isn't filled with connection-refused noise.
+        return False
     try:
         payload = {
             "event": event,

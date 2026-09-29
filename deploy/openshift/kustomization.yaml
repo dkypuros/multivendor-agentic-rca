@@ -15,6 +15,7 @@ resources:
   - capif.yaml
   - mcp.yaml
   - nep-orchestrator.yaml
+  - networkpolicy.yaml
 images:
   - name: mvrca        # every Deployment says `image: mvrca`; this points it at the in-cluster build
     newName: image-registry.openshift-image-registry.svc:5000/multivendor-rca/mvrca

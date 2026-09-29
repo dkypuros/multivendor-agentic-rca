@@ -1,6 +1,6 @@
 """Red Hat PTP MCP server — the platform (linuxptp / PTP Operator / cloud-event-proxy) boundary.
 
-Backs the diagram's 'Red Hat' server. Reads the real ptp-lab exporter (:7091).
+Backs the 'Red Hat' timing plane. Reads the ptp-bridge software model (TELCO_PTP_URL, :7091).
 Serve with: python3 -m extensions.sheldon.agentic.mcp_http --server redhat --port 8853
 """
 from extensions.sheldon.agentic import mcp_core

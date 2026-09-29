@@ -2,6 +2,11 @@
 """
 launch_slice.py — the PID-1 supervisor for the deployed co-located owned stack slice.
 
+[multivendor-agentic-rca] This repo ships only the NF scripts of the stackctl "ran" profile
+(5G core + IMS + O-RAN split RAN, 32 NFs), so TELCO_SLICE_PROFILE defaults to "ran" here.
+Mentions below of other profiles, ConfigMaps, Jaeger or an NRF liveness probe describe the
+upstream telco-lab deployment, not this one.
+
 ONE image, ONE pod, the WHOLE current slice co-located (issue #61 tracks the true
 per-NF microservices split; until then every NF hardcodes 127.0.0.1 in its NRF
 profile, so they must share a network namespace — i.e. one pod). This process is
@@ -53,7 +58,7 @@ sys.path.insert(0, str(ROOT))
 
 import tools.stackctl as stackctl  # noqa: E402  (the single source of truth)
 
-PROFILE = (os.environ.get("TELCO_SLICE_PROFILE") or "full").strip()
+PROFILE = (os.environ.get("TELCO_SLICE_PROFILE") or "ran").strip()
 
 
 def _start_nf(svc, harness_path=None):

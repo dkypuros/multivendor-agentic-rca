@@ -1,0 +1,27 @@
+# Only pods in this namespace may call each other; from outside, only the OpenShift router may
+# reach the console (the Route). CAPIF tokens in this lab are unsigned, so this policy -- not the
+# token -- is what keeps other tenants away from ptp-bridge, the O-DU's O1 config, the MCP
+# servers and the orchestrator. Egress is unrestricted (builds, optional LLM endpoint).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: same-namespace-only
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: router-to-console
+spec:
+  podSelector:
+    matchLabels: { app: ran-sandbox-controller }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }

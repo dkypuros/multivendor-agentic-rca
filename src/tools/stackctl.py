@@ -1,4 +1,8 @@
 """
+[multivendor-agentic-rca] Only the "ran" profile's NF scripts are included in this repo; it is
+used via deploy/docker/launch_slice.py. Other profiles, spec runners and agent references below
+describe the upstream telco-lab monorepo.
+
 stackctl: one command runs the world (issue #24).
 
 Start / stop / supervise the whole owned telco stack — the same process inventory, dependency

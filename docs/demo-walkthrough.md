@@ -31,14 +31,14 @@ Point at the page layout:
 **Click** **Start RAN Slice**.
 
 **What appears:**
-- The pill turns amber: `STARTING…`.
+- The pill turns amber: `STARTING...`.
 - `K8S: PATCH deployments/ran-slice/scale replicas=1`, then pod `Pending`, then `Running`. In the OpenShift tab a `ran-slice-…` pod appears.
-- `launch_slice: READY nf=nrf …`, then `udm`, `amf`, `smf`, `upf`, `ocucp`, `ocuup`, `odu`, `oru`, … 32 functions in dependency order.
+- `launch_slice: READY nf=nrf …`, then the other 31 functions in dependency tiers (UDM and friends, then AMF, …, the O-DU, and finally the O-RU, SMF and UPF), each gated `READY`, ending with `boot status=done ready=32`.
 - `K8S: … O-DU cellState=ACTIVE ru=CONNECTED`. The O-RU's fronthaul heartbeat is reaching the O-DU.
 - `UE-SIM:` lines, in order:
   `RRCSetupRequest → RRCSetup`, `RegistrationRequest → AuthenticationRequest`, `AuthenticationResponse → SecurityModeCommand`, `SecurityModeComplete → RegistrationAccept`, `PDU SESSION pduAddress=10.45.0.x`, `ECHO 3/3 replies via the RAN over the GTP-U tunnel`.
 - Interleaved lines from the pod itself: `amf: registration_accepted`, `smf: session_created`, `amf: pdu_session_established`.
-- Panels: UE `REGISTERED` / `10.45.0.x` / `3/3`; cell `ACTIVE`; RF carrier `Active (oru-1, 1 UE)`; pill `RAN RUNNING & LOCKED`.
+- Panels: UE `REGISTERED imsi-001010000000001` / `10.45.0.x` / `3/3`; cell `ACTIVE`; RF carrier `Active (oru-1, 1 UE)`; pill `RAN RUNNING & LOCKED`.
 
 **Say:**
 > "That button scaled a Kubernetes Deployment from zero to one. The pod runs a 5G core and an O-RAN split RAN: CU control plane, CU user plane, DU and RU. When the DU reported its cell active over O1, a UE simulator attached through it. The authentication is real 5G-AKA; the UE and the UDM compute MILENAGE independently. The echoes crossed the GTP-U tunnel through the CU-UP and UPF. When we're done, Stop scales it back to zero, so a shared lab doesn't pay for an idle RAN."
@@ -58,23 +58,25 @@ Point at the page layout:
 - Pill: `FAULT: CELL UNAVAILABLE`
 
 **Say:**
-> "We made the grandmaster clock jump by 50 milliseconds. A TDD cell needs to stay within about 1.5 microseconds, so this is 30,000 times over budget. The timing plane went to FREERUN, and the DU took its protective action: it locked the cell so it wouldn't transmit out of sync and interfere with neighbors. The alarm you see is raised by the DU itself: 3GPP TS 28.532, probable cause loss of real-time synchronization. To a traditional NOC this is just 'cell unavailable'."
+> "We made the grandmaster clock jump by 50 milliseconds. A TDD cell needs to stay within about 1.5 microseconds, so this is 30,000 times over budget. The timing plane went to FREERUN, and the DU's protective action was applied: the cell is locked so it won't transmit out of sync and interfere with neighbors. The alarm you see comes from the DU's own fault management: 3GPP TS 28.532, probable cause loss of real-time synchronization. To a traditional NOC this is just 'cell unavailable'."
 
-**Be precise:** the UE doesn't model radio-link failure timers (N310/T310), so there are no RLF log lines. The fault is visible at the timing and DU layers.
+**Be precise:**
+- This software O-DU has no PTP servo, so the **console** applies the protective lock over the O-DU's standard O1 interface as part of Inject Fault. The O-DU then raises the alarm itself. In other words, the DU-side symptoms follow from the injection by design; only the PTP plane observes the timing fault directly.
+- The UE doesn't model radio-link failure timers (N310/T310), so there are no RLF log lines. The fault is visible at the timing and DU layers.
 
 ## 4. Agentic root cause analysis (6 minutes)
 
 **Click** **Run 4-Plane Agentic RCA**. It takes a few seconds, or 10 to 40 s with a CPU-served LLM.
 
-**What appears:** the audit-trail panel opens.
+**What appears:** the audit-trail panel opens, headed by a Trace ID and Run ID (identifiers of this run; traces live in the orchestrator's memory, not in MLflow).
 - **Hierarchical execution spans:**
   1. `O-RAN.O1.FM.Alarm_Ingest`: DU alarms plus PTP state
-  2. `3GPP.CAPIF.Security_Authz`: the agent onboards to CAPIF and gets a token scoped to `3gpp#mcp-aef:mcp-tools`
+  2. `3GPP.CAPIF.Security_Authz`: the agent onboards to CAPIF and gets a token scoped to `3gpp#mcp-aef:mcp-tools` (first RCA; later runs reuse the token until it expires, `capif.tokenSource: cached`)
   3. `O-RAN.R1.MCP_Tool_Execution`: four tool calls through the MCP gateway
   4. `O-RAN.NonRT_RIC.Deterministic_Router`: the decision
   5. `Enterprise.AI.LLM_Synthesis`: the narrative
   6. `TMForum.TMF688.Audit_Event_Emission`
-- **View Raw Response JSON** → `tmf688Event.event.evidence`, one entry per plane:
+- **View Raw Response JSON** → `event.evidence`, one entry per plane:
 
 | Plane | Typical evidence | Signal |
 |---|---|---|
@@ -83,17 +85,19 @@ Point at the page layout:
 | platform (PTP) | `ptp4l offset -50000198 ns (limit 100000), DU port UNCALIBRATED` | `ptp_offset_exceeded` |
 | hardware (NIC, **emulated**) | `EMULATED ethtool -S: tx_hwtstamp_timeouts=1, delta 74.4 ms` | `nic_firmware_suspect` |
 
-- **Decision:** `faultClass: OC-TimingDegraded`, `corroboration: 3/3`, `decision: APPLY (auto)`.
+- **Decision:** `faultClass: OC-TimingDegraded`, `corroboration: 2/3`, `decision: HOLD — below the bar, needs human approval`. The router span lists `policy.corroboratingPlanes: [platform, ran]` and `policy.emulatedPlanesNotCounted: [hardware]`.
 - **Narrative:** with an LLM, the model's explanation plus its model id and latency. Without one, `[template - LLM unavailable] …` over the same evidence.
 
 **Say:**
-> "The agent didn't get the keys to the kingdom. It onboarded to CAPIF, the 3GPP exposure framework, and received a token scoped to four tool families. The MCP gateway checked that token before routing each call to a plane-specific server. Three planes independently point at timing: the DU's own alarm, the PTP offset, and the NIC's hardware-timestamp counters. The routing table is deterministic, and three of three corroborating planes meets the bar, so the policy says this could be applied automatically. Below the bar it says HOLD and a human signs. The LLM never makes that decision. It only explains evidence that's already in the audit record, and the whole thing is emitted as a TM Forum TMF688 event."
+> "The agent doesn't get free rein. It onboarded through CAPIF, the 3GPP exposure framework, and received a token scoped to exactly the four read-only evidence tools; the MCP gateway checks that scope before routing each call to a plane-specific server. Every plane points at timing: the PTP offset, the DU's loss-of-sync alarm, and the NIC's hardware-timestamp counters. But the NIC here is emulated, and the policy refuses to let synthetic evidence push a decision over the bar. So we have two real corroborating planes against a bar of three: the verdict is HOLD, and a human has to approve any remediation. The routing table is deterministic. The LLM never makes that decision; it only explains evidence that's already in the audit record, and the whole thing is emitted as a TM Forum TMF688 event."
 
 **Be precise:**
-- The **NIC plane is emulated**; its response carries `emulated: true`. It reports the fault only while PTP is actually unlocked.
+- The **NIC plane is emulated**: its response carries `emulated: true`, it reports the fault only while PTP is actually unlocked, and it **never counts** toward the bar.
+- The DU alarm follows from the lock the console applied during Inject (see section 3). The PTP plane is the one that observes the fault directly.
 - The **O-Cloud plane** is real only with ACM. Without it, it says it's unavailable, and it doesn't count toward the decision.
-- `APPLY (auto)` is the policy's verdict. **Nothing is executed automatically.** Remediation in this demo is the Heal button.
-- An LLM narrative may say remediation was "triggered". It's describing the verdict, and the audit record is the source of truth.
+- **CAPIF in this lab issues unsigned tokens.** The exchange and scoping are real, but the security boundary is the namespace NetworkPolicy, not the token.
+- The verdicts are `APPLY (auto-eligible)`, `HOLD — below the bar, needs human approval` and `NO ACTION — no fault signals`. **Nothing is executed automatically, and the lab has no approval workflow.** Remediation in this demo is the Heal button.
+- An LLM narrative may say remediation was "triggered" or "approved". It's paraphrasing the verdict; the audit record is the source of truth.
 
 ## 5. Heal and re-check (2 minutes)
 
@@ -101,14 +105,16 @@ Point at the page layout:
 
 **What appears:** `PTP-BRIDGE: … lock_state=LOCKED offset=0 ns`, `O1: … administrativeState=UNLOCKED`. Cell `ACTIVE`, alarm `None`, pill `RAN RUNNING & LOCKED`.
 
-**Click** **Run 4-Plane Agentic RCA** again. `faultClass` is `null`, `corroboration 0/3`, `HOLD`. The same agent, fed healthy evidence, finds nothing. This is the control case that shows the diagnosis came from the evidence.
+**Click** **Run 4-Plane Agentic RCA** again. `faultClass` is `null`, `corroboration 0/3`, `NO ACTION — no fault signals`. The same agent, fed healthy evidence, finds nothing. This control case shows the diagnosis tracks the state of the planes rather than being fixed.
+
+See a [real example run](examples/heal-recheck-run.md) of inject, RCA, heal and re-check, with the log lines, spans and TMF688 event you should see.
 
 ## 6. Stop (1 minute)
 
 **Click** **Stop RAN Slice**. `K8S: PATCH … replicas=0`, then `slice pod terminated; its CPU and memory are released`. The pod disappears from the OpenShift tab, the UE and cell panels go idle, and the pill reads `RAN STOPPED (IDLE)`.
 
 **Close:**
-> "One click brought up a RAN and core, a UE proved the user plane, a timing fault took the cell down, and a governed agent gathered multivendor evidence, decided by policy, explained with an LLM, and left an audit trail. Then we gave the resources back."
+> "One click brought up a RAN and core, a UE proved the user plane, a timing fault took the cell down, and a governed agent gathered multivendor evidence, decided by policy (and held back, because not enough of that evidence was real), explained with an LLM, and left an audit trail. Then we gave the resources back."
 
 ## Back-pocket proof (if someone asks "is that real?")
 

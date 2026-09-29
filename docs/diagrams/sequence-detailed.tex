@@ -68,7 +68,7 @@
 \msg{0}{1}{2}{Start RAN Slice}
 \msg{1}{3}{3}{PATCH scale ran-slice replicas=1}
 \msg{3}{4}{4}{schedule pod}
-\note{4}{5.1}{launch\_slice.py boots 32 NFs\\NRF $\to$ UDM $\to$ AMF $\to$ SMF $\to$ UPF $\to$ O-CU $\to$ O-DU $\to$ O-RU}
+\note{4}{5.1}{launch\_slice.py boots 32 NFs in dependency tiers\\(NRF first; core, IMS, O-CU, O-DU, O-RU), each gated READY}
 \msg{1}{4}{6.4}{GET /o1/status (poll)}
 \rep{4}{1}{7.2}{cellState=ACTIVE, ru=CONNECTED}
 \msg{1}{2}{8}{spawn ue\_sim}
@@ -82,31 +82,31 @@
 % ---------- 2. Fault
 \msg{0}{1}{15.2}{Inject Fault}
 \msg{1}{5}{16}{POST /ptp/inject $\to$ FREERUN, $-$50\,ms}
-\msg{1}{4}{16.8}{PUT /o1/config administrativeState=LOCKED}
+\msg{1}{4}{16.8}{PUT /o1/config LOCKED (protective action, applied by console)}
 \note{4}{17.9}{O-DU raises TS 28.532 alarm\\CellUnavailable / lossOfRealTimeSynchronization}
 
 % ---------- 3. RCA
 \msg{0}{1}{20.2}{Run RCA}
-\msg{1}{6}{21}{POST /nep/rca/trigger}
+\msg{1}{6}{21}{POST /nep/rca/trigger?view=full}
 \msg{6}{4}{21.8}{GET /o1/alarms}
 \msg{6}{5}{22.6}{GET /ptp}
-\msg{6}{7}{23.6}{onboard invoker,\\request token}
+\msg{6}{7}{23.6}{register, publish, onboard,\\token (first run; then cached)}
 \rep{7}{6}{24.4}{JWT scope mcp-tools}
 \msg{6}{8}{25.4}{tools/call $\times$4\\(Bearer JWT)}
-\note{8}{26.5}{check iss / exp / scope\\route by tool name}
+\note{8}{26.5}{check iss / exp / scope (unsigned lab JWT)\\route by tool name}
 \msg{8}{9}{27.6}{route to plane}
 \msg{9}{4}{28.4}{RAN plane: O-DU O1 status + alarms}
 \msg{9}{5}{29.2}{PTP plane: /ptp offset}
 \rep{9}{6}{30}{testimony + signals (NIC plane emulated)}
-\note{6}{31.2}{deterministic route table\\OC-TimingDegraded, 3/3 planes}
+\note{6}{31.2}{deterministic route table: OC-TimingDegraded\\RAN + PTP = 2/3 (emulated NIC not counted) $\to$ HOLD}
 \msg{6}{10}{32.4}{narrate evidence}
 \rep{10}{6}{33.2}{narrative (non-decisional)}
-\rep{6}{1}{34}{TMF688 RcaConcludedEvent + 6 spans}
+\rep{6}{1}{34}{this run's trace: TMF688 RcaConcludedEvent + 6 spans}
 
 % ---------- 4. Heal & stop
 \msg{0}{1}{36.2}{Heal Timing}
 \msg{1}{5}{37}{POST /ptp/heal $\to$ LOCKED}
-\msg{1}{4}{37.8}{PUT /o1/config UNLOCKED $\to$ cell ACTIVE}
+\msg{1}{4}{37.8}{PUT /o1/config UNLOCKED $\to$ cell ACTIVE, alarm cleared}
 \msg{0}{1}{38.6}{Stop RAN Slice}
 \msg{1}{3}{39.4}{PATCH scale replicas=0}
 \msg{3}{4}{40.2}{terminate pod}

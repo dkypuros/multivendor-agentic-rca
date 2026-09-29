@@ -6,8 +6,10 @@ SCOPE, AGGREGATES `tools/list` across the backend servers (filtered to the scope
 gateway holds no cluster credential and forwards no token downward; the tool list is the per-invoker
 blast radius, enforced here.
 
-  Auth   policy mode: Authorization: Bearer <token> -> invoker (harness/sheldon/gateway-policy.yaml)
-         capif  mode: verify a CAPIF access-token JWT (iss=capif-core, exp, sub -> invoker id)
+  Auth   policy mode: Authorization: Bearer <token> -> invoker (static tokens in the policy file)
+         capif  mode: decode a CAPIF access-token JWT and check iss=capif-core, exp, scope.
+                NOTE: the lab CAPIF issues UNSIGNED tokens and this gateway does not verify a
+                signature -- it demonstrates the authorization flow, not a security boundary.
   Route  tool name -> backend (policy.routes, fnmatch globs) -> POST <backend>/mcp
   Enforce  tools/list filtered to scope; tools/call denied (-32001) if out of scope
   Audit  one line per call: invoker, method, tool, backend, allow/deny

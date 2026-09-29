@@ -7,14 +7,14 @@ Endpoints:
   GET  /ptp                  PTP state & telemetry for SMO O1 timing sensor
   GET  /ptp/cloud-events     O-RAN / Cloud Event Proxy specification event stream
   GET  /ptp/logs             Raw ptp4l / phc2sys daemon log lines
-  POST /ptp/inject           Inject master offset spike (+50ms) -> flip lock_state to FREERUN
+  POST /ptp/inject           Inject a -50 ms master-offset step -> flip lock_state to FREERUN
   POST /ptp/heal             Heal / re-discipline clock -> flip lock_state to LOCKED
 """
 import json
 import os
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get("PTP_BRIDGE_PORT", "7091"))
 NODE = os.environ.get("PTP_NODE_NAME", "lab-node")   # label used in identities / CloudEvent sources
@@ -144,6 +144,6 @@ class PtpHandler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
-    server = HTTPServer(("0.0.0.0", PORT), PtpHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), PtpHandler)
     print(f"[ptp_bridge] Serving OpenShift PTP status on 0.0.0.0:{PORT}/ptp", flush=True)
     server.serve_forever()

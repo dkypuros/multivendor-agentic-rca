@@ -10,13 +10,22 @@ kind: Role
 metadata:
   name: ran-sandbox-controller
 rules:
+  # Start/Stop: read and scale exactly one Deployment.
   - apiGroups: ["apps"]
-    resources: ["deployments", "deployments/scale"]
+    resources: ["deployments"]
     resourceNames: ["ran-slice"]
-    verbs: ["get", "patch", "update"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: ["ran-slice"]
+    verbs: ["get", "patch"]
+  # Status + log stream: find the slice pod (label selector) and tail its log.
   - apiGroups: [""]
-    resources: ["pods", "pods/log"]
-    verbs: ["get", "list"]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -48,6 +57,11 @@ spec:
         - name: controller
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "services/ran/sandbox_controller.py"]
           env:
             - { name: PORT, value: "7098" }

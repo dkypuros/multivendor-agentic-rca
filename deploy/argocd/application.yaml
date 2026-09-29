@@ -1,5 +1,6 @@
 # Optional GitOps: let Argo CD (or OpenShift GitOps) own deploy/openshift.
-# 1. Point repoURL at your fork/mirror and give Argo CD read access to it.
+# 1. Point repoURL at your fork/mirror and give Argo CD read access to it. If you change the
+#    namespace, also change it in deploy/openshift/kustomization.yaml (namespace + images).
 # 2. oc apply -f deploy/argocd/application.yaml   (in the namespace Argo CD watches)
 # The image is still built with `oc start-build mvrca --from-dir=.` (or your CI).
 apiVersion: argoproj.io/v1alpha1
@@ -21,6 +22,10 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
+    # OpenShift GitOps' default instance only manages namespaces carrying this label.
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/managed-by: openshift-gitops
   # The sandbox's Start/Stop buttons scale ran-slice 0 <-> 1; don't let self-heal undo that.
   ignoreDifferences:
     - group: apps

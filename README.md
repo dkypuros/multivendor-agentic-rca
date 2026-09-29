@@ -1,8 +1,8 @@
 # Multivendor Agentic RCA for Cloud RAN
 
-An on-demand **5G RAN + core sandbox** on OpenShift with a live **PTP timing-fault injection** and a governed, **agentic root cause analysis** that gathers evidence from several network "planes" over MCP, authorized by CAPIF.
+An on-demand **5G RAN + core sandbox** on OpenShift with a live **PTP timing-fault injection** and a governed, **agentic root cause analysis** that gathers evidence from several network "planes" over MCP, using a CAPIF-style scoped-token exchange.
 
-You open a web console, start a RAN, watch a UE attach, inject a timing fault, and ask an agent why the cell went down. Every panel on the page reads a running component. None of the page's content is scripted.
+You open a web console, start a RAN, watch a UE attach, inject a timing fault, and ask an agent why the cell went down. Every panel and log line on the page comes from a running component or a real call. Nothing is pre-scripted.
 
 [![High-level sequence: start RAN, inject timing fault, agentic RCA, heal and stop](docs/diagrams/sequence-overview.png)](https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-overview.pdf)
 
@@ -15,8 +15,8 @@ You open a web console, start a RAN, watch a UE attach, inject a timing fault, a
 |---|---|
 | **Start RAN Slice** | The console scales the `ran-slice` Deployment from 0 to 1. The pod boots 32 network functions. When the O-DU reports `cellState=ACTIVE` over O1, a UE registers with real 5G-AKA (MILENAGE), opens a PDU session, and sends 3 echoes through the GTP-U tunnel. |
 | **Inject Fault** | The PTP bridge goes `FREERUN` with a −50 ms offset. The console locks the cell over O1 as a protective carrier shutdown. The O-DU then raises the TS 28.532 alarm `CellUnavailable / lossOfRealTimeSynchronization` itself. |
-| **Run RCA** | The NEP orchestrator ingests the O1 alarms and PTP state and gets a scoped CAPIF token. It then asks four MCP "planes" for testimony and routes the signals through a deterministic table, so no LLM is involved in the decision. It emits a TMF688 `RcaConcludedEvent`. If an LLM is configured, it narrates the evidence. |
-| **Heal Timing** | PTP goes back to `LOCKED`, the cell is unlocked and back to `ACTIVE`, and the alarm clears. A second RCA finds no fault. |
+| **Run RCA** | The NEP orchestrator ingests the O1 alarms and PTP state and gets a scoped CAPIF token. It then asks four MCP "planes" for testimony and routes the signals through a deterministic table; no LLM is involved in the decision. During the fault it diagnoses `OC-TimingDegraded` with **2/3** corroborating real planes (RAN + PTP). The emulated NIC agrees but is not counted, so the verdict is **HOLD** (needs human approval). It emits a TMF688 `RcaConcludedEvent`. If an LLM is configured, it narrates the evidence. |
+| **Heal Timing** | PTP goes back to `LOCKED`, the cell is unlocked and back to `ACTIVE`, and the alarm clears. A second RCA finds no fault (`NO ACTION`). |
 | **Stop RAN Slice** | The slice scales to 0, and its CPU and memory are released. |
 
 The first two columns of the table below matter most. This is a **software lab**, and it tells you which parts are real and which are models:
@@ -26,10 +26,13 @@ The first two columns of the table below matter most. This is a **software lab**
 | RAN + 5G core | Python NFs following 3GPP/O-RAN procedures (RRC, NAS, F1AP/E1AP shapes, PFCP, GTP-U) | Real protocol logic, software-only radio (no PHY/RF) |
 | UE | `ue_sim` with MILENAGE 5G-AKA | Real crypto and NAS flow, simulated radio |
 | Timing (PTP) | `ptp-bridge`: ptp4l-style state and CloudEvents | Software model of a PHC, with fault injection |
-| O-DU alarm | The O-DU's own O1 `/o1/alarms` | Real, raised by the O-DU |
-| NIC (Intel E810) | `nic_timestamp_counters` | **Emulated**, labeled as emulated in every response |
-| O-Cloud | OCM/ACM `ManagedCluster` health through kubectl | Real **if** ACM plus a kubeconfig are provided. Otherwise the plane reports "unavailable" rather than inventing evidence |
+| O-DU alarm | The O-DU's own O1 `/o1/alarms` | Raised by the O-DU. The O-DU has no PTP servo, though: the console applies its protective cell lock over O1 as part of **Inject Fault**, and the alarm follows from that lock. **Only the PTP plane observes the injected fault directly.** |
+| NIC (Intel E810) | `nic_timestamp_counters` | **Emulated**: labeled in every response, follows the real PTP state, and **never counts toward the decision bar** |
+| O-Cloud | OCM/ACM `ManagedCluster` health through kubectl | Real **only if** you add `kubectl`, a kubeconfig and ACM ([how](docs/deployment.md#optional-o-cloud-plane-with-acm)). Otherwise the plane reports "unavailable" rather than inventing evidence |
+| CAPIF + MCP gateway | `capif`, `mcp-gateway` | The TS 29.222 flow (register, publish, onboard, scoped token) and scope-based tool routing are real. **Tokens are unsigned lab JWTs, and the gateway doesn't verify signatures**, so this shows the authorization flow. It is not a security boundary; the namespace NetworkPolicy is. |
 | LLM narrative | Any OpenAI-compatible endpoint | Optional. Without one, a labeled template summarizes the same evidence |
+
+> **Security:** this is a lab. The console's Route has **no login**, so anyone who can reach its URL can start and stop the RAN or inject faults. Share the URL deliberately, or front it with an OAuth proxy or IP allow-list ([deployment.md](docs/deployment.md#security-notes)).
 
 ## Quick start
 
@@ -39,7 +42,7 @@ The first two columns of the table below matter most. This is a **software lab**
 git clone https://github.com/<you>/multivendor-agentic-rca.git && cd multivendor-agentic-rca
 
 oc new-project multivendor-rca
-oc apply -k deploy/openshift                                   # 10 Deployments, Services, RBAC, Route, BuildConfig
+oc apply -k deploy/openshift                                   # 10 Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
 oc start-build mvrca --from-dir=. --follow                     # build the one image every component runs
 oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
 
@@ -77,7 +80,7 @@ The whole use case also runs on a laptop. The only fake is a stub Kubernetes API
 
 ```bash
 pip install pyyaml            # the MCP gateway's only third-party dependency
-python3 tests/e2e_local.py    # starts every component, drives Start/Inject/RCA/Heal/Stop, 34 checks
+python3 tests/e2e_local.py    # starts every component, drives Start/Inject/RCA/Heal/Stop, 35 checks
 ```
 
 ## Repository layout
@@ -106,10 +109,11 @@ Verified on **OpenShift 4.22.1** on 28 Sep 2026, using exactly the steps above:
 
 ## Provenance
 
-Extracted from the `telco-lab` monorepo (the `gitea-oberon/` tree, Gitea commit `a1bb39e`). This repo keeps only the code this use case imports: 73 files out of about 1,400.
+Extracted from the `telco-lab` monorepo (Gitea commit `a1bb39e`). `src/` keeps only the code this use case runs: 69 files out of about 1,400.
 
 It also improves on the monorepo's RCA path:
 - The RAN plane testifies from the O-DU's O1 alarms.
 - Plane evidence and the narrative are built from the tool results that actually came back, never from fixed strings.
-- The emulated NIC plane follows the real PTP state.
+- The emulated NIC plane follows the real PTP state, and emulated planes never count toward the decision bar.
+- The CAPIF token is issued once and reused until it expires.
 - LLM endpoint, model and timeouts are configurable.

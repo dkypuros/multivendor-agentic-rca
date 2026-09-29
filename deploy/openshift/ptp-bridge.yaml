@@ -13,13 +13,22 @@ spec:
     metadata:
       labels: { app: ptp-bridge }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: ptp-bridge
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "services/smo/ptp_bridge.py"]
           env: [{ name: PTP_BRIDGE_PORT, value: "7091" }]
           ports: [{ name: http, containerPort: 7091 }]
+          readinessProbe:
+            httpGet: { path: /ptp, port: 7091 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 32Mi }
             limits: { cpu: 200m, memory: 128Mi }

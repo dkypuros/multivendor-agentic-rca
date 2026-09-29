@@ -1,6 +1,6 @@
 # Deployment guide
 
-This guide installs the whole use case into **one OpenShift project** from a checkout of this repo. It was verified on OpenShift 4.22.1 by following these steps exactly.
+This guide installs the whole use case into **one OpenShift project** from a checkout of this repo. It was verified on OpenShift 4.22.1 by following these steps exactly, with `tests/smoke_route.py` passing at the end.
 
 - [Prerequisites](#prerequisites)
 - [What gets deployed](#what-gets-deployed)
@@ -12,6 +12,7 @@ This guide installs the whole use case into **one OpenShift project** from a che
 - [Use a different namespace](#use-a-different-namespace)
 - [Update after a code change](#update-after-a-code-change)
 - [Uninstall](#uninstall)
+- [Security notes](#security-notes)
 - [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
@@ -22,12 +23,14 @@ These are assumed to exist before you begin:
 |---|---|---|
 | OpenShift **4.x** cluster (verified on 4.22) | Uses `BuildConfig`, `ImageStream` and `Route`. Plain Kubernetes works if you build the image elsewhere and replace the Route with an Ingress. | `oc version` |
 | `oc` CLI logged in | All steps use `oc` | `oc whoami` |
-| Permission to **create a project** and be its admin | Everything is namespaced: Deployments, a Role and RoleBinding, BuildConfig, Route. **No cluster-admin is needed.** | `oc auth can-i create projectrequests` |
+| Permission to **create a project** and be its admin | Everything is namespaced: Deployments, a Role and RoleBinding, NetworkPolicies, BuildConfig, Route. **No cluster-admin is needed.** | `oc auth can-i create projectrequests` |
 | **Internal image registry** enabled | The build pushes the image to `image-registry.openshift-image-registry.svc:5000/<ns>/mvrca` | `oc get configs.imageregistry.operator.openshift.io cluster -o jsonpath='{.spec.managementState}'` → `Managed` |
 | Build pods can reach **registry.access.redhat.com** and **PyPI** | Base image `ubi9/python-312`, plus `pip install pyyaml` | A disconnected cluster needs a mirror. See [Troubleshooting](#troubleshooting). |
-| Pods may use **UDP** between pods in the namespace | The UE's user-plane echoes go over UDP 7011 to the `ran-slice` Service | The default OVN-Kubernetes allows this. Check any NetworkPolicy you add. |
-| Capacity | Idle: about 10 m CPU and 120 MiB for 9 small pods. **RAN running:** one more pod, about 50 m CPU and 420 MiB used (request 200 m / 512 MiB, limit 2 CPU / 2 GiB) | `oc adm top nodes` |
-| Python 3.11+ on your workstation | Only to run the test scripts in `tests/` (stdlib only) | `python3 --version` |
+| Pods may use **UDP** between pods in the namespace | The UE's user-plane echoes go over UDP 7011 to the `ran-slice` Service | OVN-Kubernetes allows this; the shipped NetworkPolicy allows all traffic *within* the namespace |
+| The OpenShift router's namespace carries `policy-group.network.openshift.io/ingress` | The shipped NetworkPolicy admits the Route's traffic by that label (standard on OpenShift 4.x) | `oc get ns openshift-ingress --show-labels` |
+| Capacity | **Scheduling requests** while idle: 140 m CPU and 448 MiB across 9 pods. **RAN running** adds one pod requesting 200 m / 512 MiB (limit 2 CPU / 2 GiB). Measured usage on the test cluster: about 1 m / 13 MiB per idle pod, and about 50 m / 420 MiB for the running slice. | `oc adm top pods` |
+| A browser with internet access | The console page loads Tailwind CSS from `cdn.tailwindcss.com`. Without it, the page works but is unstyled. | — |
+| Python 3.11+ on your workstation | Only for `tests/`. `smoke_route.py` is stdlib-only; `e2e_local.py` also needs PyYAML. | `python3 --version` |
 
 Not required:
 - **An LLM.** It's optional. The RCA decision never uses one. See [below](#optional-connect-an-llm).
@@ -50,8 +53,11 @@ Not required:
 
 Supporting objects:
 - the `mvrca` ImageStream and BuildConfig (binary, Docker strategy, `Containerfile`)
-- a ServiceAccount, Role and RoleBinding, so the console can scale **only** `ran-slice` and read its pods and logs
+- a ServiceAccount, Role and RoleBinding for the console. It may get and scale **only** the `ran-slice` Deployment, list pods and read pod logs in the namespace, and nothing else. No other pod mounts a ServiceAccount token.
+- two NetworkPolicies: pods may only be reached from inside the namespace, and the console also from the OpenShift router
 - the `ran-sandbox` Route (edge TLS, 180 s timeout)
+
+Every container runs as non-root with no privilege escalation, all capabilities dropped and the `RuntimeDefault` seccomp profile. That fits OpenShift's `restricted-v2` SCC.
 
 All 10 Deployments run **one image**; each one's `command` picks the component.
 
@@ -88,9 +94,11 @@ Automated, through the Route, exactly as the browser does it. This leaves the sl
 python3 tests/smoke_route.py https://$(oc get route ran-sandbox -o jsonpath='{.spec.host}')
 ```
 
-Expected output:
+Expected output (abridged; details in parentheses omitted):
 
 ```
+status:
+  PASS  sandbox answers; PTP bridge reachable
 start:
   PASS  slice pod ready
   PASS  O-DU cell ACTIVE
@@ -101,11 +109,16 @@ inject fault:
   PASS  O-DU cell UNAVAILABLE + CellUnavailable alarm
 RCA during fault:
         cluster   signals=[]  unavailable: ocloud_unavailable kubectl failed ...
-        ran       signals=['du_sync_loss_alarm']  cell UNAVAILABLE, RU CONNECTED, admin LOCKED, CellUnavailable/lossOfRealTimeSynchronization
+        ran       signals=['du_sync_loss_alarm']  cell UNAVAILABLE, RU CONNECTED, admin LOCKED, CellUnavailable/lossOfRealTimeSynchronizatio
         platform  signals=['ptp_offset_exceeded']  ptp4l offset -50000198 ns (limit 100000), DU port UNCALIBRATED
         hardware  signals=['nic_firmware_suspect']  EMULATED ethtool -S: tx_hwtstamp_timeouts=1, delta 74.4 ms
-  PASS  diagnosis OC-TimingDegraded  (OC-TimingDegraded 3/3 APPLY (auto))
-...
+  PASS  diagnosis OC-TimingDegraded; emulated NIC not counted -> HOLD  (OC-TimingDegraded 2/3 HOLD — below the bar, needs human approval)
+  PASS  narrative present
+heal:
+  PASS  PTP LOCKED, cell ACTIVE, no alarm
+  PASS  RCA after heal finds no fault
+stop:
+  PASS  slice stopped
 ALL GREEN
 ```
 
@@ -132,8 +145,8 @@ oc rollout restart deployment/nep-orchestrator
 
 - `AI_GATEWAY_URL` is the base URL, without `/v1`. `LLM_MODEL` must match an id from `GET <url>/v1/models`.
 - Optional keys in the same Secret: `LLM_TIMEOUT` (seconds, default 90) and `LLM_MAX_TOKENS` (default 200). Small CPU-served models run at about 5 tokens/s, so keep the timeout generous.
-- Check the result: the RCA panel's model label shows your model id and latency. With no LLM, or a failing one, it shows `none (deterministic template)`, and the raw JSON carries `llm_error` with the reason.
-- The Route timeout is 180 s. Raise `haproxy.router.openshift.io/timeout` in `deploy/openshift/ran-sandbox.yaml` if your model is slower.
+- Check the result: the RCA panel's model label shows your model id and latency. With no LLM, or a failing one, the narrative starts with `[template - LLM unavailable]`, and the span `Enterprise.AI.LLM_Synthesis` has status `FALLBACK`. The reason is in `llmSynthesis.llm_error`: `oc exec deploy/nep-orchestrator -- python3 -c "import urllib.request,json;print(json.load(urllib.request.urlopen('http://127.0.0.1:7095/nep/audit/latest'))['llmSynthesis'])"`.
+- **Timeouts, innermost first:** `LLM_TIMEOUT` (NEP → LLM, default 90 s), then `RCA_TIMEOUT` on `ran-sandbox-controller` (console → NEP, default 150 s), then the Route (browser → console, 180 s). Keep them in that order if you raise any of them.
 
 ## Optional: O-Cloud plane with ACM
 
@@ -144,11 +157,15 @@ To enable it:
 2. Mount a kubeconfig for an ACM hub as a Secret into `mcp-ocloud`.
 3. Set `SHELDON_KUBECONFIG` to that path.
 
-Available ManagedClusters then contribute `managedcluster_unavailable` / `managedcluster_clock_unsynced` signals.
+Every visible ManagedCluster then testifies. One that is not `Available` raises `managedcluster_unavailable`, and one whose clock is not synced raises `managedcluster_clock_unsynced`. Both rank **above** timing in the route table (`OC-ClusterUnavailable`, `OC-ClockDrift`), so an unhealthy hub can change the diagnosis.
+
+The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cloud *action* tools (power, reprovision) stay out of scope.
 
 ## Optional: GitOps with Argo CD
 
 `deploy/argocd/application.yaml` is a ready-made Application for `deploy/openshift`. Edit `repoURL` (and its namespace, if you're not on OpenShift GitOps), give Argo CD read access to your repo, then apply it.
+
+The default OpenShift GitOps instance only manages namespaces labelled `argocd.argoproj.io/managed-by: openshift-gitops`. The Application sets that label on the namespace it creates (`managedNamespaceMetadata`). If the namespace already exists, add the label yourself: `oc label ns multivendor-rca argocd.argoproj.io/managed-by=openshift-gitops`.
 
 It sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
 
@@ -160,7 +177,7 @@ Change **both** places in `deploy/openshift/kustomization.yaml`:
 - `namespace:`
 - the namespace segment of `images[0].newName`, `image-registry.openshift-image-registry.svc:5000/<namespace>/mvrca`
 
-Services address each other by short name, so nothing else changes.
+Also use the new name in `oc new-project`, `oc delete project` and, if you use it, `deploy/argocd/application.yaml` (`destination.namespace`). Services address each other by short name, so nothing else changes.
 
 ## Update after a code change
 
@@ -171,11 +188,24 @@ oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
 
 The Deployments use the `latest` tag with `imagePullPolicy: Always`, so a restart picks up the new build. `ran-slice` pulls it the next time you press **Start**.
 
+After editing `deploy/openshift/gateway-policy.yaml`, re-apply and run `oc rollout restart deployment/mcp-gateway`. The gateway only reads its policy at startup.
+
 ## Uninstall
 
 ```bash
 oc delete project multivendor-rca
 ```
+
+## Security notes
+
+This is a lab deployment. Know these before you share the URL:
+
+- **The console has no login.** Anyone who can reach the Route can start or stop the RAN slice (up to 2 CPU / 2 GiB), inject or heal the timing fault, and trigger RCAs, which call your LLM if one is configured. To restrict it:
+  - put an OAuth proxy in front, or
+  - limit source addresses with `oc annotate route ran-sandbox haproxy.router.openshift.io/ip_whitelist="<cidr> <cidr>"`.
+- **CAPIF tokens are unsigned lab JWTs** (`alg: none`), and the MCP gateway checks their issuer, expiry and scope but not a signature. The TS 29.222 exchange and scope-based routing are real, but they don't stop a forged token. **The boundary is the NetworkPolicy** (`deploy/openshift/networkpolicy.yaml`): only pods in this namespace can reach the PTP bridge, the O-DU's O1 config, CAPIF, the gateway, the MCP servers and the orchestrator. Anything that can run a pod in this namespace is trusted.
+- The UE key in `src/services/core/udm/subscribers.json` (and the console's `UE_K` default) is the public **3GPP TS 35.208 Test Set 1** key, meant for exactly this kind of lab. No real subscriber data ships.
+- Only the console mounts a ServiceAccount token, and its Role is limited to the calls listed in [What gets deployed](#what-gets-deployed).
 
 ## Troubleshooting
 
@@ -183,10 +213,11 @@ oc delete project multivendor-rca
 |---|---|
 | Pods in `ImagePullBackOff` right after `oc apply -k` | Expected until the first build finishes. Run steps 3 and 4. If it persists, check that `images.newName` in `kustomization.yaml` names **your** namespace. |
 | Build fails pulling `ubi9/python-312` or on `pip install` | The build has no egress. Mirror the base image, then set `FROM` in `Containerfile`. For PyYAML, either vendor it or use an internal PyPI (`PIP_INDEX_URL` as a build env). |
-| Start stays at `STARTING…`, log shows `O-DU not answering yet` | `oc describe pod -l app=ran-slice`. Usually scheduling (the pod requests 512 MiB) or an image pull. `oc logs deploy/ran-slice` shows each NF reaching `READY`. |
-| Start fails with a K8S `403` in the log | The Role or RoleBinding is missing, or someone renamed `ran-slice`. The Role only allows scaling the Deployment named `ran-slice`. |
+| Start stays at `STARTING...`, log shows `O-DU not answering yet` | `oc describe pod -l app=ran-slice`. Usually scheduling (the pod requests 512 MiB) or an image pull. `oc logs deploy/ran-slice` shows each NF reaching `READY`. |
+| The log shows `SANDBOX: STARTING failed: HTTP Error 403: Forbidden` | The Role or RoleBinding is missing, or someone renamed `ran-slice`. The Role only covers the Deployment named `ran-slice`. |
+| The Route returns *Application is not available* while the console pod is Ready | The router namespace lacks the `policy-group.network.openshift.io/ingress` label that `networkpolicy.yaml` admits. Check `oc get ns openshift-ingress --show-labels`, and adjust the `router-to-console` policy to your router's namespace labels. |
 | UE registers but echo shows `0/3` | UDP to `ran-slice:7011` is blocked. Check NetworkPolicies, and check that the Service still lists the `uu` UDP port. |
 | RCA shows the CAPIF span `ERROR` and every plane `no CAPIF token` | `oc logs deploy/capif`, and check that `CAPIF_URL` on `nep-orchestrator` is `http://capif:7027`. |
-| RCA planes all `unavailable: … 401/403` | Gateway policy mismatch. The ConfigMap `gateway-policy` must keep `capifIssuer: capif-core` and the `mcp-tools` scope. |
-| RCA request ends with a gateway timeout in the browser | LLM slower than the Route timeout. Raise the Route annotation or lower `LLM_MAX_TOKENS`. |
+| RCA planes all `unavailable: unauthorized: …` or `… not in invoker … scope` | Gateway policy mismatch. The ConfigMap `gateway-policy` must keep `capifIssuer: capif-core` and the `mcp-tools` scope listing the four tools. Restart `mcp-gateway` after changing it. |
+| RCA panel shows `RCA FAILED … timed out` | The LLM is slower than `RCA_TIMEOUT` (150 s). Lower `LLM_MAX_TOKENS` or `LLM_TIMEOUT`, or raise `RCA_TIMEOUT` together with the Route timeout (see [LLM](#optional-connect-an-llm)). |
 | The RAN plane says `O-DU O1 unreachable (is the RAN slice running?)` | The RCA ran while the slice was stopped. This is correct behavior. Press Start first. |

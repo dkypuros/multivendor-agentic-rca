@@ -1,9 +1,6 @@
-"""Red Hat PTP plane — linuxptp / PTP Operator / cloud-event-proxy evidence.
-
-Reads the REAL ptp-lab exporter (:7091, TELCO_PTP_URL) for ptp4l offset + port state, and derives
-the cloud-event-proxy lock-state view an operator or agent would consume. The clock beneath is a
-mock PHC (fidelity note in the PTP walkthrough), but the protocol, BMCA and notification path are
-real — nothing downstream can tell.
+"""Red Hat PTP plane -- linuxptp / PTP Operator / cloud-event-proxy shaped evidence.
+Reads the ptp-bridge (TELCO_PTP_URL, :7091): a software model of ptp4l offset + port state, from
+which the cloud-event-proxy lock-state view is derived. No PTP hardware or PTP Operator involved.
 """
 import json
 import os
@@ -31,7 +28,7 @@ def ptp_operator_status(a=None):
     d = _get("/ptp")
     off = d.get("phc_offset_ns")
     exceeded = off is not None and abs(off) > OFFSET_LIMIT_NS
-    return {"plane": "platform", "source": "ptp4l / PTP Operator (real, mock PHC)",
+    return {"plane": "platform", "source": "ptp-bridge (software model of ptp4l)",
             "gm_port_state": d.get("gm_port_state"), "du_port_state": d.get("du_port_state"),
             "phc_offset_ns": off, "offset_limit_ns": OFFSET_LIMIT_NS,
             "signal": "ptp_offset_exceeded" if exceeded else None}

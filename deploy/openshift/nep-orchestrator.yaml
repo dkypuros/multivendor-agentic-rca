@@ -18,10 +18,16 @@ spec:
     metadata:
       labels: { app: nep-orchestrator }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: nep
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "services/orchestrator/nep_orchestrator.py"]
           env:
             - { name: PORT, value: "7095" }

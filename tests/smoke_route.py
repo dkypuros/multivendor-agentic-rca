@@ -49,45 +49,53 @@ s = call("GET", "/api/ran/status")
 print("status:")
 check("sandbox answers; PTP bridge reachable", s["ptp"] is not None, s["errors"])
 
-print("start:")
-call("POST", "/api/ran/start")
-s = settle(300)
-ue = s["ue"] or {}
-check("slice pod ready", "Ready" in (s["pod"] or ""), s["pod"])
-check("O-DU cell ACTIVE", (s["o1"] or {}).get("cellState") == "ACTIVE", s["errors"])
-check("UE registered", ue.get("registered") is True)
-check("PDU session + 3/3 GTP-U echoes", bool(ue.get("pduAddress")) and ue.get("echo") == "3/3",
-      f"{ue.get('pduAddress')} {ue.get('echo')}")
+try:
+    print("start:")
+    call("POST", "/api/ran/start")
+    s = settle(300)
+    ue = s["ue"] or {}
+    check("slice pod ready", "Ready" in (s["pod"] or ""), s["pod"])
+    check("O-DU cell ACTIVE", (s["o1"] or {}).get("cellState") == "ACTIVE", s["errors"])
+    check("UE registered", ue.get("registered") is True)
+    check("PDU session + 3/3 GTP-U echoes", bool(ue.get("pduAddress")) and ue.get("echo") == "3/3",
+          f"{ue.get('pduAddress')} {ue.get('echo')}")
 
-print("inject fault:")
-call("POST", "/api/ran/inject-ptp-fault")
-time.sleep(3)
-s = call("GET", "/api/ran/status")
-check("PTP FREERUN", s["ptp"]["port_state"] == "FREERUN")
-check("O-DU cell UNAVAILABLE + CellUnavailable alarm", s["o1"]["cellState"] == "UNAVAILABLE" and bool(s["alarms"]))
+    print("inject fault:")
+    call("POST", "/api/ran/inject-ptp-fault")
+    time.sleep(3)
+    s = call("GET", "/api/ran/status")
+    check("PTP FREERUN", (s["ptp"] or {}).get("port_state") == "FREERUN")
+    check("O-DU cell UNAVAILABLE + CellUnavailable alarm",
+          (s["o1"] or {}).get("cellState") == "UNAVAILABLE" and bool(s["alarms"]))
 
-print("RCA during fault:")
-r, ev = rca()
-check("NEP answered", "error" not in r, r.get("error", ""))
-for t in ev.get("evidence", []):
-    print(f"        {t['plane']:9s} signals={t['signals']}  {t['evidence'][:90]}")
-check("diagnosis OC-TimingDegraded", ev.get("faultClass") == "OC-TimingDegraded",
-      f"{ev.get('faultClass')} {ev.get('corroboration')} {ev.get('decision')}")
-check("narrative present", bool((r.get("llmSynthesis") or {}).get("summary")), (r.get("llmSynthesis") or {}).get("model"))
+    print("RCA during fault:")
+    r, ev = rca()
+    check("NEP answered", "error" not in r, r.get("error", ""))
+    for t in ev.get("evidence", []):
+        print(f"        {t['plane']:9s} signals={t['signals']}  {t['evidence'][:90]}")
+    check("diagnosis OC-TimingDegraded; emulated NIC not counted -> HOLD",
+          ev.get("faultClass") == "OC-TimingDegraded" and ev.get("decision", "").startswith("HOLD"),
+          f"{ev.get('faultClass')} {ev.get('corroboration')} {ev.get('decision')}")
+    check("narrative present", bool((r.get("llmSynthesis") or {}).get("summary")), (r.get("llmSynthesis") or {}).get("model"))
+finally:
+    # Always leave the lab clean (PTP healed, slice stopped), even if a check above blew up.
+    print("heal:")
+    call("POST", "/api/ran/heal-ptp")
+    time.sleep(3)
+    s = call("GET", "/api/ran/status")
+    check("PTP LOCKED, cell ACTIVE, no alarm",
+          (s["ptp"] or {}).get("port_state") == "LOCKED" and (s["o1"] or {}).get("cellState") == "ACTIVE"
+          and not s["alarms"])
+    try:
+        r, ev = rca()
+        check("RCA after heal finds no fault", ev.get("faultClass") is None, ev.get("decision"))
+    except Exception as exc:                     # never skip the Stop below
+        check("RCA after heal finds no fault", False, repr(exc))
 
-print("heal:")
-call("POST", "/api/ran/heal-ptp")
-time.sleep(3)
-s = call("GET", "/api/ran/status")
-check("PTP LOCKED, cell ACTIVE, no alarm",
-      s["ptp"]["port_state"] == "LOCKED" and s["o1"]["cellState"] == "ACTIVE" and not s["alarms"])
-r, ev = rca()
-check("RCA after heal finds no fault", ev.get("faultClass") is None, ev.get("corroboration"))
-
-print("stop:")
-call("POST", "/api/ran/stop")
-s = settle(120)
-check("slice stopped", s["pod"] == "none", s["pod"])
+    print("stop:")
+    call("POST", "/api/ran/stop")
+    s = settle(120)
+    check("slice stopped", s["pod"] == "none", s["pod"])
 
 print("ALL GREEN" if not failures else f"{failures} FAILED")
 sys.exit(1 if failures else 0)

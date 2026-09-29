@@ -20,11 +20,11 @@ PTP bridge /ptp on every poll. The log stream merges this controller's own actio
 the slice pod's real stdout (Kubernetes pods/log), so what you read is what ran.
 
 Why a co-located slice and not the per-NF pods: every NF still advertises 127.0.0.1 to the
-NRF and dials its peers on loopback (issue #61), so the per-NF Deployments in telco-ran
-cannot reach each other. launch_slice.py is the repo's supported way to run a connected stack.
+NRF and dials its peers on loopback (upstream issue #61), so one-pod-per-NF Deployments
+cannot reach each other. launch_slice.py is the supported way to run a connected stack.
 
 Stdlib only. In-cluster it authenticates with its ServiceAccount token (see
-deploy/ran/sandbox-controller.yaml for the Role).
+deploy/openshift/ran-sandbox.yaml for the Role).
 """
 import http.server
 import json
@@ -49,6 +49,8 @@ SLICE_DEPLOYMENT = os.environ.get("SLICE_DEPLOYMENT", "ran-slice")
 SLICE_HOST = os.environ.get("SLICE_HOST", "ran-slice")
 ODU_URL = os.environ.get("ODU_URL", f"http://{SLICE_HOST}:7010").rstrip("/")
 SLICE_READY_TIMEOUT = float(os.environ.get("SLICE_READY_TIMEOUT", "240"))
+RCA_TIMEOUT = float(os.environ.get("RCA_TIMEOUT", "150"))       # keep below the Route timeout (180s)
+UE_TIMEOUT = float(os.environ.get("UE_TIMEOUT", "120"))         # hard deadline for one ue_sim run
 
 UE_SUPI = os.environ.get("UE_SUPI", "imsi-001010000000001")
 UE_K = os.environ.get("UE_K", "465b5ce8b199b49faa5f0a2ee238a6bc")   # the seeded lab subscriber
@@ -72,7 +74,7 @@ class Kube:
     """Minimal in-cluster client: scale one Deployment, read it, list its pods, tail a log."""
 
     def __init__(self):
-        self.namespace = os.environ.get("SLICE_NAMESPACE") or self._read(SA_DIR / "namespace") or "telco-ran"
+        self.namespace = os.environ.get("SLICE_NAMESPACE") or self._read(SA_DIR / "namespace") or "default"
         ca = SA_DIR / "ca.crt"
         self.ctx = ssl.create_default_context(cafile=str(ca)) if ca.exists() else None
 
@@ -129,8 +131,9 @@ class SandboxController:
         self.events = []          # this controller's own action log: {ts, source, message}
         self.busy = None          # "STARTING" / "STOPPING" while an action thread runs
         self.ue = None            # last ue_sim outcome
+        self.gen = 0              # bumped whenever an action finishes; stale status is never cached
         self._log_cache = (0.0, [])
-        self._status_cache = (0.0, None)
+        self._status_cache = (0.0, -1, None)
         self.log("SANDBOX", f"Controller up. Slice deployment={self.kube.namespace}/{SLICE_DEPLOYMENT}, "
                             f"O-DU O1={ODU_URL}, PTP bridge={PTP_BRIDGE_URL}.")
 
@@ -153,7 +156,7 @@ class SandboxController:
             finally:
                 with self.lock:
                     self.busy = None
-                self._status_cache = (0.0, None)
+                    self.gen += 1
         threading.Thread(target=wrapper, daemon=True).start()
         return {"accepted": True, "status": name}
 
@@ -164,6 +167,7 @@ class SandboxController:
         return self._run("STOPPING", self._stop)
 
     def _start(self):
+        self.ue = None            # a new Start must never show the previous attach's result
         self.log("K8S", f"PATCH deployments/{SLICE_DEPLOYMENT}/scale replicas=1")
         self.kube.scale(1)
         deadline = time.time() + SLICE_READY_TIMEOUT
@@ -192,7 +196,10 @@ class SandboxController:
         env = dict(os.environ, TELCO_URL_ODU=ODU_URL, TELCO_HOST=SLICE_HOST, TELCO_PORT_OFFSET=SLICE_PORT_OFFSET)
         self.log("UE-SIM", "$ python3 " + " ".join(cmd[1:3]) + " <k> " + " ".join(cmd[4:]))
         ue = {"supi": UE_SUPI, "registered": False, "pduAddress": None, "echo": None, "rc": None}
-        proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, errors="replace")
+        watchdog = threading.Timer(UE_TIMEOUT, proc.kill)   # reading stdout blocks; this bounds it
+        watchdog.start()
         try:
             for line in proc.stdout:
                 line = line.rstrip()
@@ -205,10 +212,13 @@ class SandboxController:
                     ue["pduAddress"] = line.split("pduAddress=")[1].split()[0]
                 if "ECHO" in line:
                     ue["echo"] = line.split("ECHO", 1)[1].split("replies")[0].strip()
-            ue["rc"] = proc.wait(timeout=90)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            ue["rc"] = -1
+        finally:
+            watchdog.cancel()
+            if proc.poll() is None:          # the loop raised: never leave a child behind
+                proc.kill()
+            ue["rc"] = proc.wait()
+        if ue["rc"] == -9:
+            self.log("UE-SIM", f"killed after {UE_TIMEOUT:.0f}s deadline")
         self.log("UE-SIM", f"exit code {ue['rc']}" + ("" if ue["rc"] == 0 else " (attach FAILED)"))
         self.ue = ue
 
@@ -266,10 +276,12 @@ class SandboxController:
         return f"{p['metadata']['name']} {p['status'].get('phase')}{' Ready' if ready else ''}"
 
     def status(self):
-        cached_at, cached = self._status_cache
-        if cached and time.time() - cached_at < 2:
-            return dict(cached, busy=self.busy)
-        out = {"deployment": None, "pod": None, "o1": None, "alarms": [], "ptp": None, "ue": self.ue, "errors": {}}
+        with self.lock:
+            busy, ue, gen = self.busy, self.ue, self.gen
+        cached_at, cached_gen, cached = self._status_cache
+        if cached and cached_gen == gen and time.time() - cached_at < 2:
+            return dict(cached, busy=busy, ue=ue)
+        out = {"deployment": None, "pod": None, "o1": None, "alarms": [], "ptp": None, "errors": {}}
         try:
             d = self.kube.deployment()
             out["deployment"] = {"replicas": d["spec"].get("replicas", 0),
@@ -286,8 +298,11 @@ class SandboxController:
             out["ptp"] = http_json("GET", f"{PTP_BRIDGE_URL}/ptp", timeout=2)
         except Exception as exc:
             out["errors"]["ptp"] = str(exc)
-        self._status_cache = (time.time(), out)
-        return dict(out, busy=self.busy)
+        with self.lock:
+            if self.gen == gen:                  # no action finished while we probed
+                self._status_cache = (time.time(), gen, out)
+        # busy/ue were read BEFORE probing: a caller seeing busy=None gets probe data from after it
+        return dict(out, busy=busy, ue=ue)
 
     def logs(self):
         """Controller events + the slice pod's real stdout, merged on timestamp."""
@@ -297,7 +312,8 @@ class SandboxController:
             try:
                 pods = self.kube.pods()
                 if pods:
-                    pod_lines = [self._parse_pod_line(l) for l in self.kube.log(pods[0]["metadata"]["name"]).splitlines() if l.strip()]
+                    pod_lines = [self._parse_pod_line(l) for l in self.kube.log(pods[0]["metadata"]["name"]).splitlines()
+                                 if l.strip()]
             except Exception:
                 pass
             self._log_cache = (time.time(), pod_lines)
@@ -322,13 +338,13 @@ class SandboxController:
         if rest.startswith("{"):
             try:
                 rec = json.loads(rest)
-                source = rec.pop("nf", "ran-slice")
-                event = rec.pop("event", "")
+                source = str(rec.pop("nf", "ran-slice"))
+                event = str(rec.pop("event", "") or "")
                 for k in ("ts", "level", "trace_id", "span_id"):
                     rec.pop(k, None)
                 msg = event + (" " + " ".join(f"{k}={v}" for k, v in rec.items()) if rec else "")
-            except ValueError:
-                pass
+            except (ValueError, AttributeError):   # not a JSON object: keep the raw line
+                source, msg = "ran-slice", rest
         elif rest.startswith("[launch_slice]"):
             source, msg = "launch_slice", rest[len("[launch_slice]"):].strip()
         return {"ts": dt.isoformat(), "source": source, "message": msg}
@@ -444,7 +460,7 @@ HTML_PAGE = """<!DOCTYPE html>
             <h3 class="font-semibold text-sm text-[#1f2328]">O-RAN & TM Forum Unified Agentic Audit Trail</h3>
             <span id="rca-badge" class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-[#dafbe1] text-[#1a7f37] border border-[#aceebb]">TMF688 Concluded</span>
           </div>
-          <p class="text-xs text-[#656d76] mt-0.5">Trace ID: <span class="font-mono text-[#1f2328]" id="trace-id">-</span> | MLflow Run: <span class="font-mono text-[#1f2328]" id="mlflow-id">-</span></p>
+          <p class="text-xs text-[#656d76] mt-0.5">Trace ID: <span class="font-mono text-[#1f2328]" id="trace-id">-</span> | Run ID: <span class="font-mono text-[#1f2328]" id="mlflow-id">-</span></p>
         </div>
         <button onclick="document.getElementById('rca-panel').classList.add('hidden')" class="text-[#656d76] hover:text-[#1f2328] text-xs font-semibold px-2 py-1 bg-[#f6f8fa] border border-[#d0d7de] rounded">Close</button>
       </div>
@@ -622,9 +638,10 @@ class SandboxHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, ctl.heal())
         elif self.path == "/api/ran/trigger-rca":
             try:
-                http_json("POST", f"{NEP_URL}/nep/rca/trigger", {}, timeout=150)
-                audit_trace = http_json("GET", f"{NEP_URL}/nep/audit/latest", timeout=10)
-                ctl.log("NEP", "RCA triggered; audit trace fetched")
+                audit_trace = http_json("POST", f"{NEP_URL}/nep/rca/trigger?view=full", {}, timeout=RCA_TIMEOUT)
+                ev = audit_trace.get("tmf688Event", {}).get("event", {})
+                ctl.log("NEP", f"RCA {ev.get('traceId')}: {ev.get('faultClass') or 'no fault'} "
+                               f"({ev.get('corroboration')}) -> {ev.get('decision')}")
                 self._send_json(200, audit_trace)
             except Exception as e:
                 ctl.log("NEP", f"RCA call FAILED: {e}")
@@ -637,7 +654,6 @@ class SandboxHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(b)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(b)
 

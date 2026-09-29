@@ -16,11 +16,17 @@ spec:
     metadata:
       labels: { app: ran-slice }
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 15
       containers:
         - name: slice
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "deploy/docker/launch_slice.py"]
           env:
             - { name: TELCO_SLICE_PROFILE, value: "ran" }

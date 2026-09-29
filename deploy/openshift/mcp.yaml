@@ -13,13 +13,22 @@ spec:
     metadata:
       labels: { app: mcp-gateway }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: gateway
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "-m", "extensions.sheldon.agentic.gateway",
                     "--host", "0.0.0.0", "--port", "8800", "--policy", "/etc/gateway/gateway-policy.yaml"]
           ports: [{ name: http, containerPort: 8800 }]
+          readinessProbe:
+            tcpSocket: { port: 8800 }
+            periodSeconds: 10
           volumeMounts: [{ name: policy, mountPath: /etc/gateway }]
           resources:
             requests: { cpu: 10m, memory: 48Mi }
@@ -50,12 +59,21 @@ spec:
     metadata:
       labels: { app: mcp-ocloud }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mcp
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "ocloud", "--port", "8850"]
           ports: [{ name: http, containerPort: 8850 }]
+          readinessProbe:
+            tcpSocket: { port: 8850 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 48Mi }
             limits: { cpu: 200m, memory: 128Mi }
@@ -82,14 +100,23 @@ spec:
     metadata:
       labels: { app: mcp-ran }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mcp
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "ran", "--port", "8851"]
           env:
             - { name: RAN_O1_URL, value: "http://ran-slice:7010" }
           ports: [{ name: http, containerPort: 8851 }]
+          readinessProbe:
+            tcpSocket: { port: 8851 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 48Mi }
             limits: { cpu: 200m, memory: 128Mi }
@@ -116,12 +143,21 @@ spec:
     metadata:
       labels: { app: mcp-intel }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mcp
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "intel", "--port", "8852"]
           ports: [{ name: http, containerPort: 8852 }]
+          readinessProbe:
+            tcpSocket: { port: 8852 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 48Mi }
             limits: { cpu: 200m, memory: 128Mi }
@@ -148,14 +184,23 @@ spec:
     metadata:
       labels: { app: mcp-redhat }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mcp
           image: mvrca
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities: { drop: [ALL] }
+            seccompProfile: { type: RuntimeDefault }
           command: ["python3", "-m", "extensions.sheldon.agentic.mcp_http", "--server", "redhat", "--port", "8853"]
           env:
             - { name: TELCO_PTP_URL, value: "http://ptp-bridge:7091" }
           ports: [{ name: http, containerPort: 8853 }]
+          readinessProbe:
+            tcpSocket: { port: 8853 }
+            periodSeconds: 10
           resources:
             requests: { cpu: 10m, memory: 48Mi }
             limits: { cpu: 200m, memory: 128Mi }
