@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multivendor Agentic RCA</title>
+<style>
+  :root { --fg:#1a1a1a; --muted:#666; --line:#999; --bg:#fff; --panel:#f4f4f4; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6e6e6; --muted:#9a9a9a; --line:#777; --bg:#161616; --panel:#222; } }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--fg);
+    font: 17px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  section { min-height: 100vh; padding: 56px 0 40px; border-bottom: 1px solid var(--line);
+    display:flex; flex-direction:column; justify-content:center; }
+  h1 { font-size: 2.1em; margin: 0 0 .3em; font-weight: 600; }
+  h2 { font-size: 1.5em; margin: 0 0 .8em; font-weight: 600; }
+  .n { color: var(--muted); font-size: .8em; font-weight: 400; margin-right: .4em; }
+  p, li { max-width: 72ch; }
+  .muted { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: .92em; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; }
+  code { font: .9em ui-monospace, Menlo, Consolas, monospace; background: var(--panel); padding: 1px 4px; }
+  svg { width: 100%; height: auto; color: var(--fg); }
+  svg text { fill: currentColor; font: 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  svg .sm { font-size: 11px; fill: var(--muted); }
+  svg .box { fill: var(--panel); stroke: currentColor; stroke-width: 1; }
+  svg .dash { fill: none; stroke: var(--line); stroke-dasharray: 4 3; }
+  svg .ln { stroke: currentColor; stroke-width: 1; fill: none; }
+  svg .life { stroke: var(--line); stroke-dasharray: 3 3; }
+  nav { position: fixed; right: 16px; bottom: 12px; font-size: .8em; color: var(--muted); }
+  @media (max-width: 640px) { body { font-size: 15px; } section { min-height: auto; padding: 40px 0; } nav { display:none; } }
+</style>
+</head>
+<body>
+<main>
+
+<section id="s1">
+  <h1>Multivendor Agentic RCA for Cloud RAN</h1>
+  <p>An on-demand 5G RAN and core sandbox on OpenShift, a live PTP timing-fault injection, and a governed agent that finds the root cause by collecting evidence from every vendor's layer.</p>
+  <p class="muted">For Red Hat solution architects. Source: <a href="https://github.com/dkypuros/multivendor-agentic-rca">github.com/dkypuros/multivendor-agentic-rca</a></p>
+</section>
+
+<section id="s2">
+  <h2><span class="n">1</span>The problem</h2>
+  <p>A cell goes down. In a multivendor RAN that one symptom can come from:</p>
+  <ul>
+    <li>the RAN software (one vendor)</li>
+    <li>the cloud platform (another)</li>
+    <li>the timing network (a third)</li>
+    <li>the NIC silicon and firmware (a fourth)</li>
+  </ul>
+  <p>Each vendor's tools see only their own layer. The NOC sees "cell unavailable".</p>
+</section>
+
+<section id="s3">
+  <h2><span class="n">2</span>What we do</h2>
+  <ol>
+    <li><b>Start</b> a RAN slice on demand; a UE attaches with real 5G-AKA and sends traffic.</li>
+    <li><b>Inject</b> a timing fault: PTP goes FREERUN, the cell is locked, the O-DU raises an alarm.</li>
+    <li><b>Run RCA</b>: an agent gets a scoped CAPIF token, asks four planes for evidence over MCP, and a deterministic policy decides.</li>
+    <li><b>Heal</b> and re-check: the same agent now finds no fault.</li>
+    <li><b>Stop</b>: the slice scales to zero and releases its resources.</li>
+  </ol>
+  <p><b>Key idea:</b> the policy decides, the LLM only explains, and synthetic evidence never counts toward the decision.</p>
+</section>
+
+<section id="s4">
+  <h2><span class="n">3</span>Block diagram</h2>
+  <svg viewBox="0 0 900 430" role="img" aria-label="Block diagram of the lab components">
+    <rect class="dash" x="10" y="10" width="880" height="410"/>
+    <text x="20" y="30" class="sm">OpenShift project multivendor-rca (NetworkPolicy: same namespace only, Route to console)</text>
+
+    <rect class="box" x="30" y="60" width="170" height="54"/><text x="42" y="83">Browser</text><text x="42" y="101" class="sm">SA / presenter</text>
+    <rect class="box" x="30" y="170" width="170" height="64"/><text x="42" y="193">ran-sandbox-controller</text><text x="42" y="211" class="sm">web console, drives the demo</text>
+    <line class="ln" x1="115" y1="114" x2="115" y2="170"/><text x="122" y="146" class="sm">Route</text>
+
+    <rect class="box" x="30" y="320" width="170" height="70"/><text x="42" y="343">ran-slice (0 or 1 pod)</text><text x="42" y="361" class="sm">32 NFs: 5G core, IMS,</text><text x="42" y="376" class="sm">O-CU-CP/UP, O-DU, O-RU, UE</text>
+    <line class="ln" x1="115" y1="234" x2="115" y2="320"/><text x="122" y="270" class="sm">scale 0↔1, O1 lock/unlock</text>
+
+    <rect class="box" x="270" y="170" width="160" height="64"/><text x="282" y="193">ptp-bridge</text><text x="282" y="211" class="sm">software PTP model</text>
+    <line class="ln" x1="200" y1="195" x2="270" y2="195"/><text x="206" y="187" class="sm">inject / heal</text>
+
+    <rect class="box" x="270" y="60" width="160" height="54"/><text x="282" y="83">nep-orchestrator</text><text x="282" y="101" class="sm">RCA agent + policy</text>
+    <line class="ln" x1="200" y1="180" x2="270" y2="100"/><text x="186" y="150" class="sm">run RCA</text>
+
+    <rect class="box" x="500" y="60" width="150" height="54"/><text x="512" y="83">capif</text><text x="512" y="101" class="sm">scoped token</text>
+    <line class="ln" x1="430" y1="80" x2="500" y2="80"/>
+
+    <rect class="box" x="720" y="60" width="150" height="54"/><text x="732" y="83">LLM (optional)</text><text x="732" y="101" class="sm">narrates only</text>
+    <path class="ln" d="M430 70 C 560 30, 650 30, 720 75"/>
+
+    <rect class="box" x="500" y="170" width="150" height="54"/><text x="512" y="193">mcp-gateway</text><text x="512" y="211" class="sm">scope → tool routing</text>
+    <line class="ln" x1="400" y1="114" x2="520" y2="170"/><text x="440" y="150" class="sm">tools/call</text>
+
+    <rect class="box" x="720" y="150" width="150" height="40"/><text x="732" y="175">mcp-ocloud</text>
+    <rect class="box" x="720" y="200" width="150" height="40"/><text x="732" y="225">mcp-ran</text>
+    <rect class="box" x="720" y="250" width="150" height="40"/><text x="732" y="275">mcp-redhat (PTP)</text>
+    <rect class="box" x="720" y="300" width="150" height="40"/><text x="732" y="325">mcp-intel (NIC)</text>
+    <line class="ln" x1="650" y1="197" x2="720" y2="170"/><line class="ln" x1="650" y1="197" x2="720" y2="220"/>
+    <line class="ln" x1="650" y1="197" x2="720" y2="270"/><line class="ln" x1="650" y1="197" x2="720" y2="320"/>
+
+    <text x="720" y="360" class="sm">ocloud: ACM, else "unavailable"</text>
+    <text x="720" y="376" class="sm">ran: reads O-DU O1 on ran-slice</text>
+    <text x="720" y="392" class="sm">redhat: reads ptp-bridge</text>
+    <text x="720" y="408" class="sm">intel: EMULATED, never counted</text>
+  </svg>
+</section>
+
+<section id="s5">
+  <h2><span class="n">4</span>Sequence (high level)</h2>
+  <svg viewBox="0 0 900 520" role="img" aria-label="High-level sequence of start, inject, RCA, heal, stop">
+    <g>
+      <text x="40"  y="20">Console</text>
+      <text x="190" y="20">ran-slice</text>
+      <text x="330" y="20">ptp-bridge</text>
+      <text x="480" y="20">NEP agent</text>
+      <text x="630" y="20">CAPIF</text>
+      <text x="760" y="20">MCP planes</text>
+      <line class="life" x1="70"  y1="30" x2="70"  y2="510"/>
+      <line class="life" x1="220" y1="30" x2="220" y2="510"/>
+      <line class="life" x1="365" y1="30" x2="365" y2="510"/>
+      <line class="life" x1="515" y1="30" x2="515" y2="510"/>
+      <line class="life" x1="650" y1="30" x2="650" y2="510"/>
+      <line class="life" x1="795" y1="30" x2="795" y2="510"/>
+    </g>
+    <defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="currentColor"/></marker></defs>
+    <g class="ln" marker-end="url(#a)">
+      <line x1="70" y1="60" x2="218" y2="60"/>
+      <line x1="220" y1="90" x2="72" y2="90"/>
+      <line x1="70" y1="140" x2="363" y2="140"/>
+      <line x1="70" y1="165" x2="218" y2="165"/>
+      <line x1="70" y1="215" x2="513" y2="215"/>
+      <line x1="515" y1="240" x2="648" y2="240"/>
+      <line x1="515" y1="265" x2="793" y2="265"/>
+      <line x1="515" y1="315" x2="72" y2="315"/>
+      <line x1="70" y1="365" x2="363" y2="365"/>
+      <line x1="70" y1="390" x2="218" y2="390"/>
+      <line x1="70" y1="425" x2="513" y2="425"/>
+      <line x1="515" y1="450" x2="72" y2="450"/>
+      <line x1="70" y1="495" x2="218" y2="495"/>
+    </g>
+    <text x="80"  y="55">Start: scale 0→1</text>
+    <text x="80"  y="85">cell ACTIVE, UE attach, 3/3 echoes</text>
+    <text x="80"  y="135">Inject: FREERUN, −50 ms</text>
+    <text x="80"  y="160">O1 lock cell → O-DU alarm</text>
+    <text x="80"  y="210">Run RCA</text>
+    <text x="525" y="235">token (scoped)</text>
+    <text x="525" y="260">4 tools/call via gateway</text>
+    <text x="525" y="290" class="sm">route table decides; LLM narrates</text>
+    <text x="80"  y="310">OC-TimingDegraded, 2/3 → HOLD (TMF688)</text>
+    <text x="80"  y="360">Heal: LOCKED, 0 ns</text>
+    <text x="80"  y="385">O1 unlock → cell ACTIVE</text>
+    <text x="80"  y="420">Run RCA again</text>
+    <text x="80"  y="445">no fault, 0/3 → NO ACTION</text>
+    <text x="80"  y="490">Stop: scale 1→0, resources released</text>
+  </svg>
+  <p class="muted">Full call-by-call version: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/diagrams/sequence-detailed.pdf">sequence-detailed.pdf</a></p>
+</section>
+
+<section id="s6">
+  <h2><span class="n">5</span>Components and fidelity</h2>
+  <table>
+    <tr><th>Component</th><th>Role</th><th>How real</th></tr>
+    <tr><td>ran-slice</td><td>5G core + O-RAN split RAN, 32 NFs in one pod</td><td>Real protocol logic in Python; no PHY/RF</td></tr>
+    <tr><td>ue_sim</td><td>UE attach, PDU session, GTP-U echo</td><td>Real MILENAGE 5G-AKA and NAS flow</td></tr>
+    <tr><td>ptp-bridge</td><td>PTP state and CloudEvents, fault injection</td><td>Software model of ptp4l</td></tr>
+    <tr><td>O-DU alarm</td><td>TS 28.532 alarm over O1</td><td>Raised by the O-DU, after the console's protective lock</td></tr>
+    <tr><td>capif</td><td>TS 29.222 onboarding and scoped token</td><td>Real flow; unsigned lab tokens</td></tr>
+    <tr><td>mcp-gateway</td><td>Scope check, routes tool calls to planes</td><td>Real; not a security boundary</td></tr>
+    <tr><td>NIC plane</td><td>Intel E810 timestamp counters</td><td><b>Emulated</b>, never counted</td></tr>
+    <tr><td>O-Cloud plane</td><td>ACM ManagedCluster health</td><td>Real only with ACM; else "unavailable"</td></tr>
+    <tr><td>nep-orchestrator</td><td>Evidence, policy, TMF688 event</td><td>Deterministic decision; LLM optional</td></tr>
+  </table>
+</section>
+
+<section id="s7">
+  <h2><span class="n">6</span>How the decision is made</h2>
+  <ul>
+    <li>Each plane returns evidence plus signals (e.g. <code>ptp_offset_exceeded</code>, <code>du_sync_loss_alarm</code>).</li>
+    <li>A fixed route table maps signals to a fault class (e.g. <code>OC-TimingDegraded</code>).</li>
+    <li>Corroboration counts <b>real</b> planes only. The bar is 3.</li>
+    <li>Verdicts: <code>APPLY (auto-eligible)</code>, <code>HOLD</code> (needs a human), <code>NO ACTION</code>.</li>
+    <li>In the demo: RAN + PTP agree, NIC is emulated → <b>2/3 → HOLD</b>. Nothing runs automatically.</li>
+    <li>The LLM explains the audit record. It never makes the decision.</li>
+  </ul>
+</section>
+
+<section id="s8">
+  <h2><span class="n">7</span>Try it</h2>
+  <p><code>oc new-project multivendor-rca</code><br>
+     <code>oc apply -k deploy/openshift</code><br>
+     <code>oc start-build mvrca --from-dir=. --follow</code></p>
+  <p>Then follow the <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">20-minute demo walkthrough</a>. No cluster? <code>python3 tests/e2e_local.py</code> runs the whole flow on a laptop.</p>
+  <p class="muted">Lab only: the console has no login. Share its URL deliberately.</p>
+</section>
+
+</main>
+<nav>↑ ↓ or scroll</nav>
+<script>
+  document.addEventListener('keydown', function (e) {
+    var s = Array.prototype.slice.call(document.querySelectorAll('section'));
+    var i = s.findIndex(function (el) { return el.getBoundingClientRect().top > 5; });
+    if (i < 0) i = s.length;
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { if (s[i]) { e.preventDefault(); s[i].scrollIntoView({behavior:'smooth'}); } }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { var p = s[Math.max(0, i - 2)]; if (p) { e.preventDefault(); p.scrollIntoView({behavior:'smooth'}); } }
+  });
+</script>
+</body>
+</html>
