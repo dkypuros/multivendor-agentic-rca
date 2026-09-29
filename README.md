@@ -120,3 +120,9 @@ It also improves on the monorepo's RCA path:
 - The emulated NIC plane follows the real PTP state, and emulated planes never count toward the decision bar.
 - The CAPIF token is issued once and reused until it expires.
 - LLM endpoint, model and timeouts are configurable.
+
+## Presentation
+
+A short overview deck for solution architects: the problem, the idea, the demo flow, the architecture, and the lab it runs on.
+
+**[View the slides](https://dkypuros.github.io/multivendor-agentic-rca/)** (GitHub Pages; source: [docs/slides/index.html](docs/slides/index.html))
