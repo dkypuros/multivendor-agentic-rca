@@ -20,6 +20,7 @@ spec:
   applicationsNamespace: redhat-ods-applications
   monitoring:
     managementState: Managed
+    metrics: {}
     namespace: redhat-ods-monitoring
   trustedCABundle:
     customCABundle: ""
@@ -44,18 +45,26 @@ spec:
       modelsAsService:
         managementState: Removed
       nim:
+        airGapped: false
         managementState: Removed
       rawDeploymentServiceConfig: Headless
+      wva:
+        managementState: Removed
     aipipelines:
       managementState: Removed
     ray:
       managementState: Removed
     kueue:
+      autoCreateQueues: false
+      defaultClusterQueueName: default
+      defaultLocalQueueName: default
       managementState: Removed
     trustyai:
       managementState: Removed
+      mcpGuardrailsMode: false
     modelregistry:
       managementState: Removed
+      registriesNamespace: rhoai-model-registries
     feastoperator:
       managementState: Removed
     mlflowoperator:
