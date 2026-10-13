@@ -1,0 +1,67 @@
+# OpenShift AI llm-d (LLMInferenceService). Default serving path.
+# Cluster has no GPU, so this overrides the default CUDA vLLM image with the
+# CPU image from kserve-parameters (kserve-llm-d-tokenizer).
+# In-cluster OpenAI base URL: http://llama-31-8b-kserve-workload-svc:8000
+#
+# Gated Hugging Face models: add a Secret named hf-secret with key HF_TOKEN
+# (GitOps, not oc patch) in the same namespace.
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: llama-31-8b
+  annotations:
+    security.opendatahub.io/enable-auth: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  replicas: 1
+  model:
+    uri: hf://RedHatAI/Llama-3.1-8B-Instruct
+    name: llama-3.1-8b-instruct
+  router:
+    route: {}
+    gateway: {}
+    scheduler:
+      replicas: 1
+      template:
+        containers:
+          - name: main
+            resources:
+              requests: { cpu: 100m, memory: 256Mi }
+              limits: { cpu: "1", memory: 1Gi }
+  template:
+    containers:
+      - name: main
+        image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:7a28b867955055a8836ea2a78e70b8bad63c1ee50e8a5f8dd95d1194f20ec489
+        env:
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: "8"
+          - name: VLLM_ADDITIONAL_ARGS
+            value: "--dtype bfloat16 --max-model-len 2048"
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-secret
+                key: HF_TOKEN
+                optional: true
+        resources:
+          requests: { cpu: "4", memory: 24Gi }
+          limits: { cpu: "8", memory: 48Gi }
+---
+# Gateway (openshift-ingress) and the RHOAI dashboard call the llm-d workload
+# from outside this namespace. same-namespace-only does not cover that path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-llmd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: llminferenceservice
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: redhat-ods-applications }

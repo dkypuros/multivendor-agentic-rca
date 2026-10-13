@@ -10,6 +10,7 @@ spec:
   source:
     repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
     targetRevision: main
+    # llm-d (default). Switch back to Ollama: deploy/overlays/multivendor-ollama
     path: deploy/overlays/multivendor
   destination:
     server: https://kubernetes.default.svc

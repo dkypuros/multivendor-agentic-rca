@@ -1,6 +1,12 @@
 # oc apply -k deploy/overlays/multivendor
+# Default LLM: OpenShift AI Distributed Inference with llm-d (LLMInferenceService).
+# Switch back to Ollama: oc apply -k deploy/overlays/multivendor-ollama
+# (GitOps: set mvrca-sandbox path to deploy/overlays/multivendor-ollama).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: multivendor-rca
 resources:
   - namespace.yaml
   - ../../base/sandbox
+  - llama-31-8b-llmisvc.yaml
+  - llm-endpoint-secret.yaml

@@ -1,6 +1,6 @@
 # CPU Llama 3.1 8B Instruct via Ollama's OpenAI-compatible /v1 API.
-# No GPU and no OpenShift AI operator. The NEP orchestrator reads llm-endpoint
-# (AI_GATEWAY_URL=http://llama-31-8b:11434, LLM_MODEL=llama3.1:8b).
+# Used by deploy/overlays/multivendor-ollama (switch back from llm-d).
+# NEP reads llm-endpoint (AI_GATEWAY_URL=http://llama-31-8b:11434, LLM_MODEL=llama3.1:8b).
 apiVersion: v1
 kind: ServiceAccount
 metadata:

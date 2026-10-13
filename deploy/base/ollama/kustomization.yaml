@@ -1,0 +1,9 @@
+# Ollama CPU serving. Kept so we can switch back from llm-d.
+# Canonical copies also remain at deploy/base/sandbox/llama-31-8b.yaml
+# and deploy/base/sandbox/llm-endpoint-secret.yaml.
+# Overlay: oc apply -k deploy/overlays/multivendor-ollama
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - llama-31-8b.yaml
+  - llm-endpoint-secret.yaml

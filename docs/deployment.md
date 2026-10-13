@@ -132,7 +132,20 @@ oc exec deploy/ran-sandbox-controller -- python3 -c \
 
 ## Optional: connect an LLM
 
-The NEP orchestrator can ask any **OpenAI-compatible** `/v1/chat/completions` endpoint to narrate the evidence. Examples are vLLM, LiteLLM, OpenShift AI model serving, or OVMS with an OpenAI front end. The LLM only writes the narrative. The diagnosis and decision come from a deterministic routing table.
+The NEP orchestrator can ask any **OpenAI-compatible** `/v1/chat/completions` endpoint to narrate the evidence. The LLM only writes the narrative. The diagnosis and decision come from a deterministic routing table.
+
+**Default (`deploy/overlays/multivendor`):** OpenShift AI Distributed Inference with **llm-d** (`LLMInferenceService` for Llama 3.1 8B Instruct on the CPU vLLM image; this cluster has no GPU). NEP is pointed at `http://llama-31-8b-kserve-workload-svc:8000`. Connectivity Link is a DSC precondition and is installed from `deploy/base/operators/subscriptions/connectivity-link.yaml`.
+
+**Switch back to Ollama:** keep `deploy/base/sandbox/llama-31-8b.yaml` and apply the Ollama overlay (or, under GitOps, change `mvrca-sandbox` to this path):
+
+```bash
+oc apply -k deploy/overlays/multivendor-ollama
+# GitOps: spec.source.path: deploy/overlays/multivendor-ollama
+```
+
+Gated Hugging Face models need a Secret `hf-secret` with key `HF_TOKEN` in `multivendor-rca` (commit it to Git; do not `oc patch`).
+
+To point NEP at some other OpenAI-compatible endpoint instead of either overlay:
 
 ```bash
 oc create secret generic llm-endpoint \
@@ -163,11 +176,13 @@ The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cl
 ## Kustomize overlays
 
 ```text
-deploy/base/operators/          operator Subscriptions and CRs
-deploy/base/sandbox/            RAN/RCA workload manifests
-deploy/overlays/operators/      oc apply -k deploy/overlays/operators
-deploy/overlays/multivendor/    oc apply -k deploy/overlays/multivendor
-deploy/overlays/all/            oc apply -k deploy/overlays/all
+deploy/base/operators/               operator Subscriptions and CRs
+deploy/base/sandbox/                 RAN/RCA workload manifests (Ollama YAML kept here)
+deploy/base/ollama/                  Ollama serving, used by the fallback overlay
+deploy/overlays/operators/           oc apply -k deploy/overlays/operators
+deploy/overlays/multivendor/         llm-d (default)  oc apply -k deploy/overlays/multivendor
+deploy/overlays/multivendor-ollama/  Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
+deploy/overlays/all/                 oc apply -k deploy/overlays/all
 ```
 
 Optional GitOps (Gitea + Argo CD) still points at those same two overlays. Bootstrap: `oc apply -k deploy/gitea` then `oc apply -k deploy/argocd`.
@@ -212,7 +227,7 @@ The bootstrap Job waits for the Argo CD CR, then applies:
 | Application | Path | What it installs |
 |---|---|---|
 | `mvrca-operators` | `deploy/overlays/operators` | OpenShift AI. Add Subscriptions under `deploy/base/operators/subscriptions/`. |
-| `mvrca-sandbox` | `deploy/overlays/multivendor` | RAN/RCA sandbox. |
+| `mvrca-sandbox` | `deploy/overlays/multivendor` | RAN/RCA sandbox + llm-d. Switch to `deploy/overlays/multivendor-ollama` to use Ollama instead. |
 
 ```bash
 oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.source.targetRevision}{"\t"}{.status.sync.status}{"\n"}{end}'
