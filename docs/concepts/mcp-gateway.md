@@ -48,8 +48,8 @@ The RCA step that makes these calls is span `O-RAN.R1.MCP_Tool_Execution`. It sh
 
 ## Code
 
-- Gateway: [gateway.py](../../src/extensions/sheldon/agentic/gateway.py), policy [gateway-policy.yaml](../../deploy/openshift/gateway-policy.yaml)
+- Gateway: [gateway.py](../../src/extensions/sheldon/agentic/gateway.py), policy [gateway-policy.yaml](../../deploy/base/sandbox/gateway-policy.yaml)
 - MCP protocol handling: [mcp_core.py](../../src/extensions/sheldon/agentic/mcp_core.py), HTTP wrapper [mcp_http.py](../../src/extensions/sheldon/agentic/mcp_http.py)
 - Plane servers: [mcp_server.py](../../src/extensions/sheldon/agentic/mcp_server.py) (O-Cloud), [mcp_ran.py](../../src/extensions/sheldon/agentic/mcp_ran.py), [mcp_redhat.py](../../src/extensions/sheldon/agentic/mcp_redhat.py), [mcp_intel.py](../../src/extensions/sheldon/agentic/mcp_intel.py)
 - The agent's fan-out: [nep_orchestrator.py#L302](../../src/services/orchestrator/nep_orchestrator.py#L302)
-- Deployments: [mcp.yaml](../../deploy/openshift/mcp.yaml)
+- Deployments: [mcp.yaml](../../deploy/base/sandbox/mcp.yaml)

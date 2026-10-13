@@ -39,7 +39,7 @@ Not required:
 
 ## What gets deployed
 
-`oc apply -k deploy/multivendor` creates these in the project:
+`oc apply -k deploy/overlays/multivendor` creates these in the project:
 
 | Deployment | Replicas | Role | Port |
 |---|---|---|---|
@@ -68,9 +68,9 @@ git clone https://github.com/<you>/multivendor-agentic-rca.git
 cd multivendor-agentic-rca
 
 # One command (operators + sandbox), or the two overlays below
-oc apply -k deploy
-# oc apply -k deploy/operators    # OpenShift AI
-# oc apply -k deploy/multivendor  # RAN/RCA sandbox (creates the project)
+oc apply -k deploy/overlays/all
+# oc apply -k deploy/overlays/operators    # OpenShift AI
+# oc apply -k deploy/overlays/multivendor  # RAN/RCA sandbox (creates the project)
 
 # Build the image from this checkout (about 2 minutes; uploads the directory as a binary build)
 oc start-build mvrca -n multivendor-rca --from-dir=. --follow
@@ -163,10 +163,11 @@ The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cl
 ## Kustomize overlays
 
 ```text
-deploy/                 oc apply -k deploy              # both overlays
-deploy/operators/       oc apply -k deploy/operators    # OpenShift AI
-deploy/multivendor/     oc apply -k deploy/multivendor  # RAN/RCA sandbox
-deploy/openshift/       workload YAML used by the multivendor overlay
+deploy/base/operators/          operator Subscriptions and CRs
+deploy/base/sandbox/            RAN/RCA workload manifests
+deploy/overlays/operators/      oc apply -k deploy/overlays/operators
+deploy/overlays/multivendor/    oc apply -k deploy/overlays/multivendor
+deploy/overlays/all/            oc apply -k deploy/overlays/all
 ```
 
 Optional GitOps (Gitea + Argo CD) still points at those same two overlays. Bootstrap: `oc apply -k deploy/gitea` then `oc apply -k deploy/argocd`.
@@ -210,8 +211,8 @@ The bootstrap Job waits for the Argo CD CR, then applies:
 
 | Application | Path | What it installs |
 |---|---|---|
-| `mvrca-operators` | `deploy/operators` | OpenShift AI. Add more Subscriptions under `deploy/operators/subscriptions/` if you need them. |
-| `mvrca-sandbox` | `deploy/multivendor` | RAN/RCA sandbox. |
+| `mvrca-operators` | `deploy/overlays/operators` | OpenShift AI. Add Subscriptions under `deploy/base/operators/subscriptions/`. |
+| `mvrca-sandbox` | `deploy/overlays/multivendor` | RAN/RCA sandbox. |
 
 ```bash
 oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.source.targetRevision}{"\t"}{.status.sync.status}{"\n"}{end}'
@@ -227,7 +228,7 @@ oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n mu
 
 ## Use a different namespace
 
-Change **both** places in `deploy/openshift/kustomization.yaml` (and `deploy/multivendor/namespace.yaml`):
+Change **both** places in `deploy/base/sandbox/kustomization.yaml` (and `deploy/overlays/multivendor/namespace.yaml`):
 - `namespace:`
 - the namespace segment of `images[0].newName`, `image-registry.openshift-image-registry.svc:5000/<namespace>/mvrca`
 
@@ -242,7 +243,7 @@ oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n mu
 
 The Deployments use the `latest` tag with `imagePullPolicy: Always`, so a restart picks up the new build. `ran-slice` pulls it the next time you press **Start**.
 
-After editing `deploy/openshift/gateway-policy.yaml`, re-apply and run `oc rollout restart deployment/mcp-gateway`. The gateway only reads its policy at startup.
+After editing `deploy/base/sandbox/gateway-policy.yaml`, re-apply and run `oc rollout restart deployment/mcp-gateway`. The gateway only reads its policy at startup.
 
 ## Uninstall
 
@@ -257,7 +258,7 @@ This is a lab deployment. Know these before you share the URL:
 - **The console has no login.** Anyone who can reach the Route can start or stop the RAN slice (up to 2 CPU / 2 GiB), inject or heal the timing fault, and trigger RCAs, which call your LLM if one is configured. To restrict it:
   - put an OAuth proxy in front, or
   - limit source addresses with `oc annotate route ran-sandbox haproxy.router.openshift.io/ip_whitelist="<cidr> <cidr>"`.
-- **CAPIF tokens are unsigned lab JWTs** (`alg: none`), and the MCP gateway checks their issuer, expiry and scope but not a signature. The TS 29.222 exchange and scope-based routing are real, but they don't stop a forged token. **The boundary is the NetworkPolicy** (`deploy/openshift/networkpolicy.yaml`): only pods in this namespace can reach the PTP bridge, the O-DU's O1 config, CAPIF, the gateway, the MCP servers and the orchestrator. Anything that can run a pod in this namespace is trusted.
+- **CAPIF tokens are unsigned lab JWTs** (`alg: none`), and the MCP gateway checks their issuer, expiry and scope but not a signature. The TS 29.222 exchange and scope-based routing are real, but they don't stop a forged token. **The boundary is the NetworkPolicy** (`deploy/base/sandbox/networkpolicy.yaml`): only pods in this namespace can reach the PTP bridge, the O-DU's O1 config, CAPIF, the gateway, the MCP servers and the orchestrator. Anything that can run a pod in this namespace is trusted.
 - The UE key in `src/services/core/udm/subscribers.json` (and the console's `UE_K` default) is the public **3GPP TS 35.208 Test Set 1** key, meant for exactly this kind of lab. No real subscriber data ships.
 - Only the console mounts a ServiceAccount token, and its Role is limited to the calls listed in [What gets deployed](#what-gets-deployed).
 

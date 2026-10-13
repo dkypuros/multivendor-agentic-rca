@@ -24,7 +24,7 @@ NRF and dials its peers on loopback (upstream issue #61), so one-pod-per-NF Depl
 cannot reach each other. launch_slice.py is the supported way to run a connected stack.
 
 Stdlib only. In-cluster it authenticates with its ServiceAccount token (see
-deploy/openshift/ran-sandbox.yaml for the Role).
+deploy/base/sandbox/ran-sandbox.yaml for the Role).
 """
 import http.server
 import json

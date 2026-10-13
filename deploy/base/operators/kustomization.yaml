@@ -1,4 +1,4 @@
-# oc apply -k deploy/operators
+# Operator base. Apply via the overlay:  oc apply -k deploy/overlays/operators
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

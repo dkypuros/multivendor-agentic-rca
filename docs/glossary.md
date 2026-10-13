@@ -12,12 +12,12 @@ Things people often ask about that are *not* running in this demo are listed at 
 
 | Term | In this demo | Code |
 |---|---|---|
-| <a id="openshift"></a>**OpenShift** | Runs everything. Tested on 4.22.1. <br>Definition: [Red Hat](https://www.redhat.com/en/technologies/cloud-computing/openshift) | [deploy/openshift](../deploy/openshift) |
-| <a id="project-namespace"></a>**Project (namespace)** | `multivendor-rca`. All 10 Deployments live here. <br>Definition: [Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) | [kustomization.yaml](../deploy/openshift/kustomization.yaml) |
+| <a id="openshift"></a>**OpenShift** | Runs everything. Tested on 4.22.1. <br>Definition: [Red Hat](https://www.redhat.com/en/technologies/cloud-computing/openshift) | [deploy/base/sandbox](../deploy/base/sandbox) |
+| <a id="project-namespace"></a>**Project (namespace)** | `multivendor-rca`. All 10 Deployments live here. <br>Definition: [Kubernetes](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) | [kustomization.yaml](../deploy/base/sandbox/kustomization.yaml) |
 | <a id="deployment-scale-0-1"></a>**Deployment scale 0↔1** | How Start and Stop work: the console patches `ran-slice` to 1 replica, or back to 0 to free CPU and memory. <br>Definition: [Kubernetes](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#scaling-a-deployment) | [sandbox_controller.py#L102](../src/services/ran/sandbox_controller.py#L102) |
-| <a id="route"></a>**Route** | The only way into the lab from outside: it exposes the console. It has no login. <br>Definition: [OKD docs](https://docs.okd.io/latest/networking/ingress_load_balancing/routes/creating-basic-routes.html) | [ran-sandbox.yaml](../deploy/openshift/ran-sandbox.yaml) |
-| <a id="networkpolicy"></a>**NetworkPolicy** | Pods accept traffic only from pods in the same project, plus the router to the console. This, not the CAPIF token, is the lab's real security boundary. <br>Definition: [Kubernetes](https://kubernetes.io/docs/concepts/services-networking/network-policies/) | [networkpolicy.yaml](../deploy/openshift/networkpolicy.yaml) |
-| <a id="buildconfig-mvrca-image"></a>**BuildConfig / `mvrca` image** | One image, built from the repo with `oc start-build`, runs every component. <br>Definition: [OKD docs](https://docs.okd.io/latest/cicd/builds/understanding-buildconfigs.html) | [build.yaml](../deploy/openshift/build.yaml), [Containerfile](../Containerfile) |
+| <a id="route"></a>**Route** | The only way into the lab from outside: it exposes the console. It has no login. <br>Definition: [OKD docs](https://docs.okd.io/latest/networking/ingress_load_balancing/routes/creating-basic-routes.html) | [ran-sandbox.yaml](../deploy/base/sandbox/ran-sandbox.yaml) |
+| <a id="networkpolicy"></a>**NetworkPolicy** | Pods accept traffic only from pods in the same project, plus the router to the console. This, not the CAPIF token, is the lab's real security boundary. <br>Definition: [Kubernetes](https://kubernetes.io/docs/concepts/services-networking/network-policies/) | [networkpolicy.yaml](../deploy/base/sandbox/networkpolicy.yaml) |
+| <a id="buildconfig-mvrca-image"></a>**BuildConfig / `mvrca` image** | One image, built from the repo with `oc start-build`, runs every component. <br>Definition: [OKD docs](https://docs.okd.io/latest/cicd/builds/understanding-buildconfigs.html) | [build.yaml](../deploy/base/sandbox/build.yaml), [Containerfile](../Containerfile) |
 
 ## Console and flow
 
@@ -118,7 +118,7 @@ Concept page: [CAPIF](concepts/capif.md)
 |---|---|---|
 | <a id="capif"></a>**[CAPIF](concepts/capif.md)** | 3GPP's API exposure framework (TS 29.222). Grants the agent a token for exactly four read-only tools. <br>Definition: [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm) | [capif.py](../src/services/core/capif/capif.py) |
 | <a id="invoker"></a>**[Invoker](concepts/capif.md)** | The agent, once onboarded to CAPIF (`invoker-…`). <br>Definition: [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm) | [capif.py#L215](../src/services/core/capif/capif.py#L215) |
-| <a id="scope"></a>**[Scope](concepts/capif.md)** | What a token allows: `3gpp#mcp-aef:mcp-tools`. <br>Definition: [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm) | [gateway-policy.yaml](../deploy/openshift/gateway-policy.yaml) |
+| <a id="scope"></a>**[Scope](concepts/capif.md)** | What a token allows: `3gpp#mcp-aef:mcp-tools`. <br>Definition: [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm) | [gateway-policy.yaml](../deploy/base/sandbox/gateway-policy.yaml) |
 | <a id="token"></a>**[Token](concepts/capif.md)** | A short-lived JWT from CAPIF. **Unsigned** in this lab. Cached and reused until it nearly expires. <br>Definition: [JWT, RFC 7519](https://datatracker.ietf.org/doc/html/rfc7519) | [capif.py#L286](../src/services/core/capif/capif.py#L286) |
 | <a id="aef"></a>**[AEF](concepts/capif.md)** | API Exposing Function: the thing that serves the API. Here, the MCP gateway. <br>Definition: [3GPP TS 29.222](https://www.3gpp.org/DynaReport/29222.htm) | [nep_orchestrator.py#L105](../src/services/orchestrator/nep_orchestrator.py#L105) |
 
