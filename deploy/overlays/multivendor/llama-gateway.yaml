@@ -1,0 +1,18 @@
+# Namespace-local Gateway so llm-d HTTPRoutes are accepted. The shared
+# data-science-gateway only allows redhat-ods-applications / openshift-ingress
+# and GitOps cannot keep extra namespaces on it (GatewayConfig resets them).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: llama-31-8b-gateway
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  gatewayClassName: data-science-gateway-class
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
