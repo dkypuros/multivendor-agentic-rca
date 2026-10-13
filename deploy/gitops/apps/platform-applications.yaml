@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mvrca-sandbox
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: mvrca
+  source:
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+    targetRevision: main
+    path: deploy/openshift
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: multivendor-rca
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+      - SkipDryRunOnMissingResource=true
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/managed-by: openshift-gitops
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: ran-slice
+      jsonPointers:
+        - /spec/replicas
+    - group: route.openshift.io
+      kind: Route
+      jsonPointers:
+        - /metadata/annotations/openshift.io~1host.generated
+        - /spec/host

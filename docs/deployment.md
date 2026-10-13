@@ -8,7 +8,7 @@ This guide installs the whole use case into **one OpenShift project** from a che
 - [Verify](#verify)
 - [Optional: connect an LLM](#optional-connect-an-llm)
 - [Optional: O-Cloud plane with ACM](#optional-o-cloud-plane-with-acm)
-- [Optional: GitOps with Argo CD](#optional-gitops-with-argo-cd)
+- [GitOps: Gitea, Argo CD, and operators](#gitops-gitea-argo-cd-and-operators)
 - [Use a different namespace](#use-a-different-namespace)
 - [Update after a code change](#update-after-a-code-change)
 - [Uninstall](#uninstall)
@@ -161,15 +161,71 @@ Every visible ManagedCluster then testifies. One that is not `Available` raises 
 
 The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cloud *action* tools (power, reprovision) stay out of scope.
 
-## Optional: GitOps with Argo CD
+## GitOps: Gitea, Argo CD, and operators
 
-`deploy/argocd/application.yaml` is a ready-made Application for `deploy/openshift`. Edit `repoURL` (and its namespace, if you're not on OpenShift GitOps), give Argo CD read access to your repo, then apply it.
+This follows the same pattern as the IMS lab: in-cluster Gitea is the source of truth, OpenShift GitOps (Argo CD) installs operators from Kustomize, then syncs the sandbox.
 
-The default OpenShift GitOps instance only manages namespaces labelled `argocd.argoproj.io/managed-by: openshift-gitops`. The Application sets that label on the namespace it creates (`managedNamespaceMetadata`). If the namespace already exists, add the label yourself: `oc label ns multivendor-rca argocd.argoproj.io/managed-by=openshift-gitops`.
+```text
+deploy/gitea/                 # in-cluster Gitea (apply first)
+deploy/argocd/                # OpenShift GitOps operator + bootstrap Job
+deploy/gitops/operators/      # Kustomize: operator Subscriptions Argo CD syncs
+deploy/gitops/apps/           # app-of-apps (sandbox Application)
+deploy/openshift/             # the RAN/RCA workload
+```
 
-It sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
+### 1. Deploy Gitea
 
-Argo CD deploys the manifests. You still build the image with `oc start-build mvrca --from-dir=.`, or point a CI pipeline at the `Containerfile`.
+```bash
+oc apply -k deploy/gitea
+oc -n gitea rollout status deploy/gitea
+```
+
+Demo credentials: `gitadmin` / `GiteaAdmin123!`
+
+### 2. Push this repo into Gitea
+
+```bash
+GITEA_HOST="$(oc get route gitea -n gitea -o jsonpath='{.spec.host}')"
+GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if git remote get-url cluster-gitea >/dev/null 2>&1; then
+  git remote set-url cluster-gitea "https://${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git"
+else
+  git remote add cluster-gitea "https://${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git"
+fi
+GIT_SSL_NO_VERIFY=true git push "https://gitadmin:GiteaAdmin123%21@${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git" "HEAD:${GIT_BRANCH}"
+```
+
+Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd` and `deploy/gitops/apps`).
+
+### 3. Bootstrap Argo CD and operator subscriptions
+
+```bash
+if oc get namespace openshift-gitops >/dev/null 2>&1; then
+  oc delete job -n openshift-gitops argocd-bootstrap-application-v1 --ignore-not-found
+fi
+oc apply -k deploy/argocd
+```
+
+If you rerun bootstrap after changing this repository, deleting the old Job first avoids the Kubernetes immutable Job template error.
+
+The bootstrap Job waits for the Argo CD CR, then applies:
+
+| Application | Path | What it installs |
+|---|---|---|
+| `mvrca-operators` | `deploy/gitops/operators` | Empty on purpose. This sandbox needs no extra operators. Add a Subscription under `subscriptions/` later if you need one. |
+| `mvrca-platform` | `deploy/gitops/apps` | App-of-apps. Creates `mvrca-sandbox` from `deploy/openshift`. |
+
+```bash
+oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.source.targetRevision}{"\t"}{.status.sync.status}{"\n"}{end}'
+```
+
+`mvrca-sandbox` sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
+
+The image is still built with `oc start-build mvrca --from-dir=.`. Then:
+
+```bash
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
+```
 
 ## Use a different namespace
 
@@ -177,7 +233,7 @@ Change **both** places in `deploy/openshift/kustomization.yaml`:
 - `namespace:`
 - the namespace segment of `images[0].newName`, `image-registry.openshift-image-registry.svc:5000/<namespace>/mvrca`
 
-Also use the new name in `oc new-project`, `oc delete project` and, if you use it, `deploy/argocd/application.yaml` (`destination.namespace`). Services address each other by short name, so nothing else changes.
+Also use the new name in `oc new-project`, `oc delete project` and, if you use GitOps, `deploy/gitops/apps/platform-applications.yaml` (`destination.namespace`). Services address each other by short name, so nothing else changes.
 
 ## Update after a code change
 

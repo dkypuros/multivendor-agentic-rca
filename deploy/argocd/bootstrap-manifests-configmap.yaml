@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-bootstrap-manifests
+  namespace: openshift-gitops
+data:
+  mvrca-project.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: AppProject
+    metadata:
+      name: mvrca
+      namespace: openshift-gitops
+    spec:
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+      destinations:
+        - namespace: '*'
+          server: https://kubernetes.default.svc
+      namespaceResourceWhitelist:
+        - group: '*'
+          kind: '*'
+      sourceRepos:
+        - http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+  openshift-gitops-tuning.yaml: |
+    apiVersion: argoproj.io/v1beta1
+    kind: ArgoCD
+    metadata:
+      name: openshift-gitops
+      namespace: openshift-gitops
+    spec:
+      kustomizeBuildOptions: --load-restrictor LoadRestrictionsNone
+      applicationSet:
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 5m
+            memory: 32Mi
+      controller:
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 4Gi
+          requests:
+            cpu: 250m
+            memory: 1Gi
+      rbac:
+        defaultPolicy: role:readonly
+        policy: |
+          g, admin, role:admin
+          g, kubeadmin, role:admin
+          g, kube:admin, role:admin
+          g, system:admin, role:admin
+          g, system:cluster-admins, role:admin
+          g, cluster-admins, role:admin
+          g, system:authenticated, role:readonly
+        scopes: '[groups, preferred_username]'
+      redis:
+        resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 5m
+            memory: 32Mi
+      repo:
+        resources:
+          limits:
+            cpu: 250m
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+      server:
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 5m
+            memory: 32Mi
+      sso:
+        dex:
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+  operators-application.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: mvrca-operators
+      namespace: openshift-gitops
+    spec:
+      destination:
+        namespace: openshift-gitops
+        server: https://kubernetes.default.svc
+      project: mvrca
+      source:
+        path: deploy/gitops/operators
+        repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 20
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - CreateNamespace=true
+          - SkipDryRunOnMissingResource=true
+          - ServerSideApply=true
+  platform-application.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: mvrca-platform
+      namespace: openshift-gitops
+    spec:
+      destination:
+        namespace: openshift-gitops
+        server: https://kubernetes.default.svc
+      project: mvrca
+      source:
+        path: deploy/gitops/apps
+        repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+        targetRevision: main
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true
+          - SkipDryRunOnMissingResource=true

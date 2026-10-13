@@ -1,0 +1,288 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea
+  namespace: gitea
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-anyuid
+  namespace: gitea
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: gitea
+    namespace: gitea
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-admin-credentials
+  namespace: gitea
+stringData:
+  username: gitadmin
+  password: GiteaAdmin123!
+type: Opaque
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-data
+  namespace: gitea
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-http
+  namespace: gitea
+spec:
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  selector:
+    app: gitea
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: gitea-http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      serviceAccountName: gitea
+      initContainers:
+        - name: prepare-storage
+          image: docker.io/gitea/gitea:1.22.6-rootless
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              mkdir -p /shared/gitea-data /shared/gitea-config
+              chown -R 1000:1000 /shared
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+      containers:
+        - name: gitea
+          image: docker.io/gitea/gitea:1.22.6-rootless
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GITEA__database__DB_TYPE
+              value: sqlite3
+            - name: GITEA__database__PATH
+              value: /var/lib/gitea/data/gitea.db
+            - name: GITEA__security__INSTALL_LOCK
+              value: "true"
+            - name: GITEA__security__SECRET_KEY
+              value: mvrca-gitea-secret-key
+            - name: GITEA__security__INTERNAL_TOKEN
+              value: mvrca-gitea-internal-token
+            - name: GITEA__service__DISABLE_REGISTRATION
+              value: "true"
+            - name: GITEA__server__DOMAIN
+              value: gitea-http.gitea.svc.cluster.local
+            - name: GITEA__server__ROOT_URL
+              value: http://gitea-http.gitea.svc.cluster.local:3000/
+            - name: GITEA__server__SSH_DOMAIN
+              value: gitea-http.gitea.svc.cluster.local
+          securityContext:
+            runAsUser: 1000
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 10m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /var/lib/gitea
+              subPath: gitea-data
+            - name: shared-storage
+              mountPath: /etc/gitea
+              subPath: gitea-config
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: gitea-data
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitea-bootstrap
+  namespace: gitea
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: gitea
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: gitea
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: prepare-storage
+          image: docker.io/gitea/gitea:1.22.6-rootless
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              mkdir -p /shared/gitea-data /shared/gitea-config
+              chown -R 1000:1000 /shared
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+        - name: wait-for-gitea
+          image: curlimages/curl:8.7.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for Gitea HTTP API to be ready..."
+              until curl -fsS http://gitea-http.gitea.svc.cluster.local:3000/api/healthz >/dev/null; do
+                echo "Gitea not ready yet, retrying in 5s..."
+                sleep 5
+              done
+              echo "Gitea is ready."
+        - name: create-admin
+          image: docker.io/gitea/gitea:1.22.6-rootless
+          env:
+            - name: GITEA_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: username
+            - name: GITEA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              CONFIG=/etc/gitea/app.ini
+              DB_PATH=/var/lib/gitea/data/gitea.db
+              until [ -f "$CONFIG" ] && [ -f "$DB_PATH" ]; do
+                sleep 5
+              done
+              gitea admin user create \
+                --admin \
+                --username "$GITEA_ADMIN_USERNAME" \
+                --password "$GITEA_ADMIN_PASSWORD" \
+                --email admin@gitea.local \
+                --config "$CONFIG" || true
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /var/lib/gitea
+              subPath: gitea-data
+            - name: shared-storage
+              mountPath: /etc/gitea
+              subPath: gitea-config
+      containers:
+        - name: create-repo
+          image: curlimages/curl:8.7.1
+          env:
+            - name: GITEA_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: username
+            - name: GITEA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: password
+            - name: GITEA_REPO_NAME
+              value: multivendor-agentic-rca
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              API=http://gitea-http.gitea.svc.cluster.local:3000
+              until curl -fsS "$API/api/healthz" >/dev/null; do
+                sleep 5
+              done
+              if ! curl -fsS -u "$GITEA_ADMIN_USERNAME:$GITEA_ADMIN_PASSWORD" \
+                "$API/api/v1/repos/$GITEA_ADMIN_USERNAME/$GITEA_REPO_NAME" >/dev/null; then
+                curl -fsS \
+                  -u "$GITEA_ADMIN_USERNAME:$GITEA_ADMIN_PASSWORD" \
+                  -H 'Content-Type: application/json' \
+                  -d "{\"name\":\"$GITEA_REPO_NAME\",\"private\":false,\"auto_init\":false,\"default_branch\":\"main\"}" \
+                  "$API/api/v1/user/repos"
+              fi
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: gitea-data

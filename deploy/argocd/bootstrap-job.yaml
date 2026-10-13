@@ -1,0 +1,125 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: argocd-bootstrap-application-v1
+  namespace: openshift-gitops
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: argocd-bootstrap
+      containers:
+        - name: bootstrap
+          image: quay.io/openshift/origin-cli:4.21
+          command:
+            - /bin/bash
+            - -lc
+            - |
+              set -euo pipefail
+
+              timestamp() {
+                date -u +"%Y-%m-%dT%H:%M:%SZ"
+              }
+
+              log() {
+                echo "[$(timestamp)] $*"
+              }
+
+              wait_timeout_seconds="${BOOTSTRAP_WAIT_TIMEOUT_SECONDS:-1800}"
+              deadline="$(( $(date +%s) + wait_timeout_seconds ))"
+
+              ensure_within_deadline() {
+                if [ "$(date +%s)" -ge "${deadline}" ]; then
+                  log "Timed out waiting for bootstrap prerequisites after ${wait_timeout_seconds}s"
+                  print_application_summary
+                  exit 1
+                fi
+              }
+
+              OC_TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              oc_cmd() {
+                oc \
+                  --token="${OC_TOKEN}" \
+                  --server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}" \
+                  --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                  "$@"
+              }
+
+              print_application_summary() {
+                log "Current Argo CD application summary:"
+                oc_cmd get applications.argoproj.io -n openshift-gitops \
+                  -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status \
+                  --no-headers || true
+              }
+
+              wait_for_argocd() {
+                local attempt=0
+                log "Waiting for Argo CD CR openshift-gitops/openshift-gitops"
+                until oc_cmd get argocd openshift-gitops -n openshift-gitops >/dev/null 2>&1; do
+                  attempt=$((attempt + 1))
+                  if (( attempt == 1 || attempt % 6 == 0 )); then
+                    log "Argo CD CR not ready yet; retrying in 10s"
+                  fi
+                  sleep 10
+                  ensure_within_deadline
+                done
+                log "Argo CD CR is present"
+              }
+
+              wait_for_argocd
+
+              log "Applying openshift-gitops tuning"
+              oc_cmd apply -f /manifests/openshift-gitops-tuning.yaml
+
+              cluster_patched=false
+              plugin_patched=false
+              log "Patching Argo CD deployments with lighter bootstrap resource requests"
+              for _ in $(seq 1 30); do
+                if [ "${cluster_patched}" != "true" ] && oc_cmd get deployment cluster -n openshift-gitops >/dev/null 2>&1; then
+                  log "Patching deployment/cluster"
+                  oc_cmd patch deployment cluster -n openshift-gitops --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"5m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"32Mi"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"100m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"64Mi"}]'
+                  cluster_patched=true
+                fi
+                if [ "${plugin_patched}" != "true" ] && oc_cmd get deployment gitops-plugin -n openshift-gitops >/dev/null 2>&1; then
+                  log "Patching deployment/gitops-plugin"
+                  oc_cmd patch deployment gitops-plugin -n openshift-gitops --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"5m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"32Mi"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"100m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"64Mi"}]'
+                  plugin_patched=true
+                fi
+                if [ "${cluster_patched}" = "true" ] && [ "${plugin_patched}" = "true" ]; then
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "${cluster_patched}" != "true" ]; then
+                log "deployment/cluster was not ready for patching during the bootstrap window"
+              fi
+              if [ "${plugin_patched}" != "true" ]; then
+                log "deployment/gitops-plugin was not ready for patching during the bootstrap window"
+              fi
+
+              log "Applying mvrca AppProject"
+              oc_cmd apply -f /manifests/mvrca-project.yaml
+
+              log "Applying mvrca-operators root application"
+              oc_cmd apply -f /manifests/operators-application.yaml
+              print_application_summary
+
+              log "Applying mvrca-platform root application"
+              oc_cmd apply -f /manifests/platform-application.yaml
+              print_application_summary
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: manifests
+              mountPath: /manifests
+      volumes:
+        - name: manifests
+          configMap:
+            name: argocd-bootstrap-manifests

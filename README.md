@@ -90,7 +90,9 @@ python3 tests/e2e_local.py    # starts every component, drives Start/Inject/RCA/
 
 ```
 deploy/openshift/     Kustomize: one namespace, every component (oc apply -k)
-deploy/argocd/        Optional Argo CD Application
+deploy/gitea/         In-cluster Gitea (GitOps source of truth)
+deploy/argocd/        OpenShift GitOps operator + Argo CD bootstrap
+deploy/gitops/        Argo CD app-of-apps and operator Subscriptions
 Containerfile         UBI9 Python 3.12 image shared by all components
 src/                  The code, laid out as in the upstream telco-lab repo so imports resolve
   services/ran/sandbox_controller.py     the console + API

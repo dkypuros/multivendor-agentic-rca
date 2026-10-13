@@ -1,0 +1,99 @@
+# CPU Llama 3.1 8B Instruct via Ollama's OpenAI-compatible /v1 API.
+# No GPU and no OpenShift AI operator. The NEP orchestrator reads llm-endpoint
+# (AI_GATEWAY_URL=http://llama-31-8b:11434, LLM_MODEL=llama3.1:8b).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: llama-31-8b
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: llama-31-8b-anyuid
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: llama-31-8b
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llama-31-8b-models
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-31-8b
+  labels: { app: llama-31-8b }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: llama-31-8b }
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels: { app: llama-31-8b }
+    spec:
+      serviceAccountName: llama-31-8b
+      containers:
+        - name: ollama
+          image: docker.io/ollama/ollama:0.11.7
+          ports:
+            - name: http
+              containerPort: 11434
+          env:
+            - { name: OLLAMA_HOST, value: "0.0.0.0:11434" }
+            - { name: OLLAMA_MODELS, value: /models }
+            - { name: OLLAMA_KEEP_ALIVE, value: "-1" }
+            - { name: OLLAMA_NUM_PARALLEL, value: "1" }
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              ollama serve &
+              until ollama list >/dev/null 2>&1; do
+                sleep 2
+              done
+              ollama pull llama3.1:8b
+              wait
+          startupProbe:
+            exec:
+              command: ["ollama", "show", "llama3.1:8b"]
+            periodSeconds: 15
+            failureThreshold: 80
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["ollama", "show", "llama3.1:8b"]
+            periodSeconds: 15
+            timeoutSeconds: 10
+          resources:
+            requests: { cpu: "2", memory: 10Gi }
+            limits: { cpu: "6", memory: 16Gi }
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: llama-31-8b-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-31-8b
+spec:
+  selector: { app: llama-31-8b }
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
