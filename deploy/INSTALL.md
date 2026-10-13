@@ -55,6 +55,7 @@ LLM: overlay `deploy/overlays/multivendor` is llm-d (default). To use Ollama ins
 echo "Demo:  https://$(oc get route ran-sandbox -n multivendor-rca -o jsonpath='{.spec.host}')"
 echo "Gitea: https://$(oc get route gitea -n gitea -o jsonpath='{.spec.host}')"
 echo "Argo:  https://$(oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='{.spec.host}')"
+echo "RHOAI: https://$(oc get route rhods-dashboard -n redhat-ods-applications -o jsonpath='{.spec.host}')"
 ```
 
 **Demo** — open the Demo URL. No login.
@@ -75,7 +76,7 @@ Repo `gitadmin/multivendor-agentic-rca` on `main` should show your push.
 ```bash
 oc get applications.argoproj.io -n openshift-gitops
 oc get pods -n multivendor-rca
-oc get llminferenceservice -n multivendor-rca
+oc get llminferenceservice -n multivendor-rca   # READY True
 oc get route ran-sandbox -n multivendor-rca
 
 python3 tests/smoke_route.py "https://$(oc get route ran-sandbox -n multivendor-rca -o jsonpath='{.spec.host}')"
