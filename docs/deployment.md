@@ -212,7 +212,7 @@ The bootstrap Job waits for the Argo CD CR, then applies:
 
 | Application | Path | What it installs |
 |---|---|---|
-| `mvrca-operators` | `deploy/gitops/operators` | Empty on purpose. This sandbox needs no extra operators. Add a Subscription under `subscriptions/` later if you need one. |
+| `mvrca-operators` | `deploy/gitops/operators` | OpenShift AI (dashboard, workbenches, KServe). Add more Subscriptions under `subscriptions/` if you need them. |
 | `mvrca-platform` | `deploy/gitops/apps` | App-of-apps. Creates `mvrca-sandbox` from `deploy/openshift`. |
 
 ```bash

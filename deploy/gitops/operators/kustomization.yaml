@@ -1,6 +1,5 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# This sandbox needs no extra operators. Stock OpenShift (BuildConfig,
-# ImageStream, Route) is enough. Drop a Subscription YAML into
-# subscriptions/ and list it here when you actually need one.
-resources: []
+resources:
+  - subscriptions/rhoai.yaml
+  - configs/rhoai-dsc.yaml
