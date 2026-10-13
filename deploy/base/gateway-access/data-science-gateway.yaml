@@ -1,7 +1,6 @@
 # RHOAI's data-science-gateway only admits HTTPRoutes from openshift-ingress
 # and redhat-ods-applications. Add the sandbox namespace so llm-d in
 # multivendor-rca can attach (dashboard inference endpoint).
-# Applied after the Gateway exists (SkipDryRunOnMissingResource on the app).
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

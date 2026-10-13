@@ -3,6 +3,4 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - subscriptions/rhoai.yaml
-  - rbac/gitops-gateway.yaml
   - configs/rhoai-dsc.yaml
-  - configs/data-science-gateway.yaml

@@ -1,0 +1,7 @@
+# Lets llm-d HTTPRoutes in multivendor-rca attach to data-science-gateway.
+# Kept off the operators overlay so a DSCI re-apply cannot block it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gitops-gateway.yaml
+  - data-science-gateway.yaml
