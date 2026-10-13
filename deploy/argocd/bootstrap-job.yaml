@@ -72,33 +72,6 @@ spec:
               log "Applying openshift-gitops tuning"
               oc_cmd apply -f /manifests/openshift-gitops-tuning.yaml
 
-              cluster_patched=false
-              plugin_patched=false
-              log "Patching Argo CD deployments with lighter bootstrap resource requests"
-              for _ in $(seq 1 30); do
-                if [ "${cluster_patched}" != "true" ] && oc_cmd get deployment cluster -n openshift-gitops >/dev/null 2>&1; then
-                  log "Patching deployment/cluster"
-                  oc_cmd patch deployment cluster -n openshift-gitops --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"5m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"32Mi"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"100m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"64Mi"}]'
-                  cluster_patched=true
-                fi
-                if [ "${plugin_patched}" != "true" ] && oc_cmd get deployment gitops-plugin -n openshift-gitops >/dev/null 2>&1; then
-                  log "Patching deployment/gitops-plugin"
-                  oc_cmd patch deployment gitops-plugin -n openshift-gitops --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"5m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"32Mi"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"100m"},{"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"64Mi"}]'
-                  plugin_patched=true
-                fi
-                if [ "${cluster_patched}" = "true" ] && [ "${plugin_patched}" = "true" ]; then
-                  break
-                fi
-                sleep 5
-              done
-
-              if [ "${cluster_patched}" != "true" ]; then
-                log "deployment/cluster was not ready for patching during the bootstrap window"
-              fi
-              if [ "${plugin_patched}" != "true" ]; then
-                log "deployment/gitops-plugin was not ready for patching during the bootstrap window"
-              fi
-
               log "Applying mvrca AppProject"
               oc_cmd apply -f /manifests/mvrca-project.yaml
 

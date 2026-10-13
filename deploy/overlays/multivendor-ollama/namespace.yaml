@@ -4,3 +4,5 @@ metadata:
   name: multivendor-rca
   labels:
     argocd.argoproj.io/managed-by: openshift-gitops
+    inference-gateway-access: "true"
+    opendatahub.io/dashboard: "true"

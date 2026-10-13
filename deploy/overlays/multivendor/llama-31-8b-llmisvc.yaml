@@ -2,9 +2,8 @@
 # Cluster has no GPU, so this overrides the default CUDA vLLM image with the
 # CPU image from kserve-parameters (kserve-llm-d-tokenizer).
 # In-cluster OpenAI base URL: https://llama-31-8b-kserve-workload-svc:8000
-# Shared data-science-gateway only admits HTTPRoutes from redhat-ods-applications
-# and openshift-ingress, so the dashboard URL may stay unready. NEP uses the
-# in-cluster Service, which does not go through that Gateway.
+# Dashboard URL uses data-science-gateway; GitOps adds multivendor-rca to that
+# Gateway's allowedRoutes (see deploy/base/operators/configs/data-science-gateway.yaml).
 #
 # Gated Hugging Face models: add a Secret named hf-secret with key HF_TOKEN
 # (GitOps, not oc patch) in the same namespace.
