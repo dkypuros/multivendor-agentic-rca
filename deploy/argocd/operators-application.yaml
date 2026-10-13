@@ -9,7 +9,7 @@ spec:
     server: https://kubernetes.default.svc
   project: mvrca
   source:
-    path: deploy/gitops/operators
+    path: deploy/operators
     repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
     targetRevision: main
   syncPolicy:

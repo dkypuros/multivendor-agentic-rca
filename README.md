@@ -41,12 +41,15 @@ The first two columns of the table below matter most. This is a **software lab**
 ```bash
 git clone https://github.com/<you>/multivendor-agentic-rca.git && cd multivendor-agentic-rca
 
-oc new-project multivendor-rca
-oc apply -k deploy/openshift                                   # 10 Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
-oc start-build mvrca --from-dir=. --follow                     # build the one image every component runs
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
+oc apply -k deploy                    # operators (OpenShift AI) + sandbox
+# or separately:
+#   oc apply -k deploy/operators     # RHOAI
+#   oc apply -k deploy/multivendor   # RAN/RCA sandbox
 
-oc get route ran-sandbox -o jsonpath='https://{.spec.host}{"\n"}'   # open this in a browser
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
+
+oc get route ran-sandbox -n multivendor-rca -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
 Verify it the same way the browser drives it:
@@ -89,10 +92,12 @@ python3 tests/e2e_local.py    # starts every component, drives Start/Inject/RCA/
 ## Repository layout
 
 ```
-deploy/openshift/     Kustomize: one namespace, every component (oc apply -k)
-deploy/gitea/         In-cluster Gitea (GitOps source of truth)
-deploy/argocd/        OpenShift GitOps operator + Argo CD bootstrap
-deploy/gitops/        Argo CD app-of-apps and operator Subscriptions
+deploy/               Top-level Kustomize: operators + multivendor (oc apply -k deploy)
+deploy/operators/     OpenShift AI and other operator Subscriptions
+deploy/multivendor/   Sandbox overlay (namespace + deploy/openshift manifests)
+deploy/openshift/     Workload manifests used by the multivendor overlay
+deploy/gitea/         Optional in-cluster Gitea
+deploy/argocd/        Optional OpenShift GitOps bootstrap
 Containerfile         UBI9 Python 3.12 image shared by all components
 src/                  The code, laid out as in the upstream telco-lab repo so imports resolve
   services/ran/sandbox_controller.py     the console + API

@@ -8,7 +8,7 @@ This guide installs the whole use case into **one OpenShift project** from a che
 - [Verify](#verify)
 - [Optional: connect an LLM](#optional-connect-an-llm)
 - [Optional: O-Cloud plane with ACM](#optional-o-cloud-plane-with-acm)
-- [GitOps: Gitea, Argo CD, and operators](#gitops-gitea-argo-cd-and-operators)
+- [Kustomize overlays](#kustomize-overlays)
 - [Use a different namespace](#use-a-different-namespace)
 - [Update after a code change](#update-after-a-code-change)
 - [Uninstall](#uninstall)
@@ -39,7 +39,7 @@ Not required:
 
 ## What gets deployed
 
-`oc apply -k deploy/openshift` creates these in the project:
+`oc apply -k deploy/multivendor` creates these in the project:
 
 | Deployment | Replicas | Role | Port |
 |---|---|---|---|
@@ -67,21 +67,20 @@ All 10 Deployments run **one image**; each one's `command` picks the component.
 git clone https://github.com/<you>/multivendor-agentic-rca.git
 cd multivendor-agentic-rca
 
-# 1. Project
-oc new-project multivendor-rca
+# One command (operators + sandbox), or the two overlays below
+oc apply -k deploy
+# oc apply -k deploy/operators    # OpenShift AI
+# oc apply -k deploy/multivendor  # RAN/RCA sandbox (creates the project)
 
-# 2. All manifests (Deployments start in ImagePullBackOff until step 3 finishes; that's expected)
-oc apply -k deploy/openshift
+# Build the image from this checkout (about 2 minutes; uploads the directory as a binary build)
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
 
-# 3. Build the image from this checkout (about 2 minutes; uploads the directory as a binary build)
-oc start-build mvrca --from-dir=. --follow
+# Restart onto the freshly built image
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
 
-# 4. Restart onto the freshly built image
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
-
-# 5. Wait for readiness (ran-slice stays at 0/0 by design)
-oc get deploy
-oc get route ran-sandbox -o jsonpath='https://{.spec.host}{"\n"}'
+# Wait for readiness (ran-slice stays at 0/0 by design)
+oc get deploy -n multivendor-rca
+oc get route ran-sandbox -n multivendor-rca -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
 Open the URL. The header should read **RAN STOPPED (IDLE)**, and the PTP panel should show `LOCKED`.
@@ -161,17 +160,16 @@ Every visible ManagedCluster then testifies. One that is not `Available` raises 
 
 The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cloud *action* tools (power, reprovision) stay out of scope.
 
-## GitOps: Gitea, Argo CD, and operators
-
-This follows the same pattern as the IMS lab: in-cluster Gitea is the source of truth, OpenShift GitOps (Argo CD) installs operators from Kustomize, then syncs the sandbox.
+## Kustomize overlays
 
 ```text
-deploy/gitea/                 # in-cluster Gitea (apply first)
-deploy/argocd/                # OpenShift GitOps operator + bootstrap Job
-deploy/gitops/operators/      # Kustomize: operator Subscriptions Argo CD syncs
-deploy/gitops/apps/           # app-of-apps (sandbox Application)
-deploy/openshift/             # the RAN/RCA workload
+deploy/                 oc apply -k deploy              # both overlays
+deploy/operators/       oc apply -k deploy/operators    # OpenShift AI
+deploy/multivendor/     oc apply -k deploy/multivendor  # RAN/RCA sandbox
+deploy/openshift/       workload YAML used by the multivendor overlay
 ```
+
+Optional GitOps (Gitea + Argo CD) still points at those same two overlays. Bootstrap: `oc apply -k deploy/gitea` then `oc apply -k deploy/argocd`.
 
 ### 1. Deploy Gitea
 
@@ -195,7 +193,7 @@ fi
 GIT_SSL_NO_VERIFY=true git push "https://gitadmin:GiteaAdmin123%21@${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git" "HEAD:${GIT_BRANCH}"
 ```
 
-Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd` and `deploy/gitops/apps`).
+Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd`).
 
 ### 3. Bootstrap Argo CD and operator subscriptions
 
@@ -212,8 +210,8 @@ The bootstrap Job waits for the Argo CD CR, then applies:
 
 | Application | Path | What it installs |
 |---|---|---|
-| `mvrca-operators` | `deploy/gitops/operators` | OpenShift AI (dashboard, workbenches, KServe). Add more Subscriptions under `subscriptions/` if you need them. |
-| `mvrca-platform` | `deploy/gitops/apps` | App-of-apps. Creates `mvrca-sandbox` from `deploy/openshift`. |
+| `mvrca-operators` | `deploy/operators` | OpenShift AI. Add more Subscriptions under `deploy/operators/subscriptions/` if you need them. |
+| `mvrca-sandbox` | `deploy/multivendor` | RAN/RCA sandbox. |
 
 ```bash
 oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.source.targetRevision}{"\t"}{.status.sync.status}{"\n"}{end}'
@@ -221,7 +219,7 @@ oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*
 
 `mvrca-sandbox` sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
 
-The image is still built with `oc start-build mvrca --from-dir=.`. Then:
+The image is still built with `oc start-build mvrca -n multivendor-rca --from-dir=.`. Then:
 
 ```bash
 oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
@@ -229,17 +227,17 @@ oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n mu
 
 ## Use a different namespace
 
-Change **both** places in `deploy/openshift/kustomization.yaml`:
+Change **both** places in `deploy/openshift/kustomization.yaml` (and `deploy/multivendor/namespace.yaml`):
 - `namespace:`
 - the namespace segment of `images[0].newName`, `image-registry.openshift-image-registry.svc:5000/<namespace>/mvrca`
 
-Also use the new name in `oc new-project`, `oc delete project` and, if you use GitOps, `deploy/gitops/apps/platform-applications.yaml` (`destination.namespace`). Services address each other by short name, so nothing else changes.
+Also use the new name in `oc delete project`. Services address each other by short name, so nothing else changes.
 
 ## Update after a code change
 
 ```bash
-oc start-build mvrca --from-dir=. --follow
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
 ```
 
 The Deployments use the `latest` tag with `imagePullPolicy: Always`, so a restart picks up the new build. `ran-slice` pulls it the next time you press **Start**.

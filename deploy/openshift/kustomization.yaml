@@ -1,4 +1,4 @@
-# Deploy everything:   oc apply -k deploy/openshift
+# Workload manifests. Apply via the overlay:  oc apply -k deploy/multivendor
 # To use a different namespace, change `namespace:` AND the namespace inside `images.newName`.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

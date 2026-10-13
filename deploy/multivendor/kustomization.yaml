@@ -1,0 +1,6 @@
+# oc apply -k deploy/multivendor
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - ../openshift
