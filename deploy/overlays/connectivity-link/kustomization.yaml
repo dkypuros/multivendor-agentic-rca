@@ -1,0 +1,5 @@
+# oc apply -k deploy/overlays/connectivity-link
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/connectivity-link

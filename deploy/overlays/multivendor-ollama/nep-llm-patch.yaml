@@ -1,0 +1,9 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nep-orchestrator
+spec:
+  template:
+    metadata:
+      annotations:
+        mvrca.llm/backend: ollama

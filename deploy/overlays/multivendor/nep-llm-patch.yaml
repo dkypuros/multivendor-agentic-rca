@@ -1,0 +1,10 @@
+# Roll NEP when the llm-d endpoint Secret changes (envFrom is only read at start).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nep-orchestrator
+spec:
+  template:
+    metadata:
+      annotations:
+        mvrca.llm/backend: llm-d

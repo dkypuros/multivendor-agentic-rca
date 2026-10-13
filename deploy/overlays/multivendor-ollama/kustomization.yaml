@@ -11,3 +11,5 @@ resources:
   - namespace.yaml
   - ../../base/sandbox
   - ../../base/ollama
+patches:
+  - path: nep-llm-patch.yaml

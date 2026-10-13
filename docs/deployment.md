@@ -179,7 +179,9 @@ The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cl
 deploy/base/operators/               operator Subscriptions and CRs
 deploy/base/sandbox/                 RAN/RCA workload manifests (Ollama YAML kept here)
 deploy/base/ollama/                  Ollama serving, used by the fallback overlay
+deploy/base/connectivity-link/       Red Hat Connectivity Link (llm-d precondition)
 deploy/overlays/operators/           oc apply -k deploy/overlays/operators
+deploy/overlays/connectivity-link/   oc apply -k deploy/overlays/connectivity-link
 deploy/overlays/multivendor/         llm-d (default)  oc apply -k deploy/overlays/multivendor
 deploy/overlays/multivendor-ollama/  Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
 deploy/overlays/all/                 oc apply -k deploy/overlays/all

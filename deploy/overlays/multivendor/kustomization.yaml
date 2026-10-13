@@ -10,3 +10,5 @@ resources:
   - ../../base/sandbox
   - llama-31-8b-llmisvc.yaml
   - llm-endpoint-secret.yaml
+patches:
+  - path: nep-llm-patch.yaml
