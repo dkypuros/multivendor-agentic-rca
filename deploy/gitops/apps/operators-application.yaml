@@ -27,7 +27,7 @@ spec:
         duration: 15s
         factor: 2
         maxDuration: 5m
-        syncOptions:
+    syncOptions:
       - CreateNamespace=true
       - SkipDryRunOnMissingResource=true
       - ServerSideApply=true
