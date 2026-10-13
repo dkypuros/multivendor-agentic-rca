@@ -27,14 +27,22 @@ spec:
         duration: 15s
         factor: 2
         maxDuration: 5m
-    syncOptions:
+        syncOptions:
       - CreateNamespace=true
       - SkipDryRunOnMissingResource=true
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
   ignoreDifferences:
     - group: "*"
       kind: "*"
       jsonPointers:
         - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
         - /metadata/annotations/argocd.argoproj.io~1tracking-id
+    # Cluster-scoped DSCI cannot be patched by the GitOps controller; skip re-apply.
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      jsonPointers:
+        - /spec
+        - /metadata/annotations
+        - /metadata/labels

@@ -20,7 +20,10 @@ spec:
     name: llama-3.1-8b-instruct
   router:
     route: {}
-    gateway: {}
+    gateway:
+      refs:
+        - name: data-science-gateway
+          namespace: openshift-ingress
     scheduler:
       replicas: 1
       template:
