@@ -196,19 +196,20 @@ oc apply -k deploy/gitea
 oc -n gitea rollout status deploy/gitea
 ```
 
-Demo credentials: `gitadmin` / `GiteaAdmin123!`
+Credentials are Secret `gitea-admin-credentials` in namespace `gitea`. Read them before you push (see [deploy/INSTALL.md](../deploy/INSTALL.md) step 2).
 
 ### 2. Push this repo into Gitea
 
+Assign hostname, username, and password, then push. URL-encode special characters in the password (`!` → `%21`).
+
 ```bash
-GITEA_HOST="$(oc get route gitea -n gitea -o jsonpath='{.spec.host}')"
-GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if git remote get-url cluster-gitea >/dev/null 2>&1; then
-  git remote set-url cluster-gitea "https://${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git"
-else
-  git remote add cluster-gitea "https://${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git"
-fi
-GIT_SSL_NO_VERIFY=true git push "https://gitadmin:GiteaAdmin123%21@${GITEA_HOST}/gitadmin/multivendor-agentic-rca.git" "HEAD:${GIT_BRANCH}"
+GITEA_HOST=$(oc get route gitea -n gitea -o jsonpath='{.spec.host}')
+GITEA_USER=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.username}' | base64 -d)
+GITEA_PASS=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.password}' | base64 -d)
+
+GIT_SSL_NO_VERIFY=true git push \
+  "https://${GITEA_USER}:${GITEA_PASS}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
+  HEAD:main
 ```
 
 Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd`).
