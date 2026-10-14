@@ -134,7 +134,7 @@ oc exec deploy/ran-sandbox-controller -- python3 -c \
 
 The NEP orchestrator can ask any **OpenAI-compatible** `/v1/chat/completions` endpoint to narrate the evidence. The LLM only writes the narrative. The diagnosis and decision come from a deterministic routing table.
 
-**Default (`deploy/overlays/multivendor`):** OpenShift AI Distributed Inference with **llm-d** (`LLMInferenceService` for Llama 3.1 8B Instruct on the CPU vLLM image; this cluster has no GPU). NEP is pointed at `http://llama-31-8b-kserve-workload-svc:8000`. Connectivity Link is a DSC precondition and is installed from `deploy/base/operators/subscriptions/connectivity-link.yaml`.
+**Default (`deploy/overlays/multivendor`):** OpenShift AI Distributed Inference with **llm-d** (`LLMInferenceService` for Llama 3.1 8B Instruct). Pick **one** file in that overlay's `kustomization.yaml` and push Gitea: `llama-31-8b-llmisvc-cpu.yaml` (default, no GPU) or `llama-31-8b-llmisvc-gpu.yaml` (NVIDIA, `nvidia.com/gpu: 1`). NEP is pointed at the in-cluster workload Service. Connectivity Link is a DSC precondition and is installed from `deploy/overlays/connectivity-link`.
 
 **Switch back to Ollama:** keep `deploy/base/sandbox/llama-31-8b.yaml` and apply the Ollama overlay (or, under GitOps, change `mvrca-sandbox` to this path):
 

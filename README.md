@@ -96,7 +96,7 @@ deploy/base/operators/              Operator Subscriptions and CRs
 deploy/base/sandbox/                RAN/RCA workload manifests (Ollama YAML kept here)
 deploy/base/ollama/                 Ollama serving, used by the fallback overlay
 deploy/overlays/operators/          oc apply -k deploy/overlays/operators
-deploy/overlays/multivendor/        llm-d (default)  oc apply -k deploy/overlays/multivendor
+deploy/overlays/multivendor/        llm-d (CPU or GPU via kustomization.yaml)  oc apply -k deploy/overlays/multivendor
 deploy/overlays/multivendor-ollama/ Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
 deploy/overlays/all/                oc apply -k deploy/overlays/all
 deploy/gitea/                       Optional in-cluster Gitea

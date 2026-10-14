@@ -4,6 +4,8 @@
 
 Argo CD syncs **Gitea**, not GitHub. A GitHub clone does not fill Gitea. After any later change, push `main` to Gitea again.
 
+llm-d is **CPU or GPU**, not both. Default in `deploy/overlays/multivendor/kustomization.yaml` is `llama-31-8b-llmisvc-cpu.yaml`. For NVIDIA GPU, comment that line, uncomment `llama-31-8b-llmisvc-gpu.yaml`, commit, and push Gitea.
+
 ## 1. Install Gitea
 
 ```bash
@@ -106,7 +108,7 @@ If `dsc/default-dsc` is NotFound, `mvrca-operators` is still installing — wait
 - **Argo CD** — Log in with OpenShift. Apps should be Synced / Healthy.
 - **RHOAI** — Log in with OpenShift. Model `llama-31-8b` becomes Ready after llm-d starts.
 
-`llama-31-8b-kserve-*` in `Init:0/1` is downloading `RedHatAI/Llama-3.1-8B-Instruct` (several minutes). Permission-denied messages on `/mnt/tmp_*` are harmless. After Init it pulls the vLLM CPU image, then loads the model. First Ready can take 15–20 minutes:
+`llama-31-8b-kserve-*` in `Init:0/1` is downloading `RedHatAI/Llama-3.1-8B-Instruct` (several minutes). Permission-denied messages on `/mnt/tmp_*` are harmless. After Init it pulls the vLLM CPU image (~5 GiB), then loads weights. `0/1 Running` with `/health` connection refused is normal until vLLM listens. CPU uses `--enforce-eager` so compile does not overrun the 10-minute startup probe. First Ready is often 8–12 minutes:
 
 ```bash
 oc get llminferenceservice llama-31-8b -n multivendor-rca
