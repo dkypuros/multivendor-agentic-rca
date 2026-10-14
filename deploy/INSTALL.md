@@ -104,7 +104,14 @@ If `dsc/default-dsc` is NotFound, `mvrca-operators` is still installing — wait
 - **Demo** — no login.
 - **Gitea** — Sign In with the username and password from step 2.
 - **Argo CD** — Log in with OpenShift. Apps should be Synced / Healthy.
-- **RHOAI** — Log in with OpenShift. Model `llama-31-8b` becomes Ready after llm-d starts (CPU image can take a while).
+- **RHOAI** — Log in with OpenShift. Model `llama-31-8b` becomes Ready after llm-d starts.
+
+`llama-31-8b-kserve-*` in `Init:0/1` is downloading `RedHatAI/Llama-3.1-8B-Instruct` (several minutes). Permission-denied messages on `/mnt/tmp_*` are harmless. After Init it pulls the vLLM CPU image, then loads the model. First Ready can take 15–20 minutes:
+
+```bash
+oc get llminferenceservice llama-31-8b -n multivendor-rca
+oc get pods -n multivendor-rca | grep llama-31-8b
+```
 
 ## 7. Check
 
