@@ -4,7 +4,7 @@
 
 Argo CD syncs **Gitea**, not GitHub. A GitHub clone does not fill Gitea. After any later change, push `main` to Gitea again.
 
-llm-d is **CPU or GPU**, not both. Default in `deploy/overlays/multivendor/kustomization.yaml` is `llama-31-8b-llmisvc-cpu.yaml`. For NVIDIA GPU, comment that line, uncomment `llama-31-8b-llmisvc-gpu.yaml`, commit, and push Gitea.
+llm-d is **CPU or GPU**, not both. `deploy/overlays/multivendor/kustomization.yaml` currently includes `llama-31-8b-llmisvc-gpu.yaml`. For CPU, comment that line, uncomment `llama-31-8b-llmisvc-cpu.yaml`, commit, and push Gitea.
 
 ## 1. Install Gitea
 
