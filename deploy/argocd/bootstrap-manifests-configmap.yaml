@@ -133,6 +133,12 @@ data:
             - /spec
             - /metadata/annotations
             - /metadata/labels
+        - group: datasciencecluster.opendatahub.io
+          kind: DataScienceCluster
+          jsonPointers:
+            - /spec
+            - /metadata/annotations
+            - /metadata/labels
   platform-application.yaml: |
     apiVersion: argoproj.io/v1alpha1
     kind: Application

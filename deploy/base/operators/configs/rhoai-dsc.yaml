@@ -30,7 +30,6 @@ apiVersion: datasciencecluster.opendatahub.io/v2
 kind: DataScienceCluster
 metadata:
   name: default-dsc
-  namespace: redhat-ods-operator
   annotations:
     argocd.argoproj.io/sync-wave: "11"
 spec:

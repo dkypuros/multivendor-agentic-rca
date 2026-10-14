@@ -39,9 +39,15 @@ spec:
       jsonPointers:
         - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
         - /metadata/annotations/argocd.argoproj.io~1tracking-id
-    # Cluster-scoped DSCI cannot be patched by the GitOps controller; skip re-apply.
+    # Operator fills extra spec after create. GitOps cannot keep /spec in sync.
     - group: dscinitialization.opendatahub.io
       kind: DSCInitialization
+      jsonPointers:
+        - /spec
+        - /metadata/annotations
+        - /metadata/labels
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
       jsonPointers:
         - /spec
         - /metadata/annotations
