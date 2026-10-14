@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - gitops-operator-group.yaml
   - gitops-operator-subscription.yaml
+  - gitops-cluster-admin.yaml
   - bootstrap-rbac.yaml
   - bootstrap-manifests-configmap.yaml
   - bootstrap-job.yaml

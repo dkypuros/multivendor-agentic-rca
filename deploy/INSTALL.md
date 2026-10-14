@@ -54,6 +54,8 @@ GIT_SSL_NO_VERIFY=true git push \
 oc apply -k deploy/argocd
 ```
 
+That apply also binds `cluster-admin` to the GitOps application controller so it can create cluster-scoped CRs (`DataScienceCluster`, `DSCInitialization`). Re-run the same command if you installed Argo CD before this binding existed.
+
 Wait for the bootstrap Job:
 
 ```bash
