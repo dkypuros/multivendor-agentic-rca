@@ -2,7 +2,7 @@
 
 `oc` logged in. Work from the **repo root**. GitOps only — do not `oc patch`.
 
-Argo CD syncs **Gitea**, not GitHub. A GitHub clone does not fill Gitea.
+Argo CD syncs **Gitea**, not GitHub. A GitHub clone does not fill Gitea. After any later change, push `main` to Gitea again.
 
 ## 1. Install Gitea
 
@@ -32,13 +32,19 @@ GITEA_USER=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.
 GITEA_PASS=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.password}' | base64 -d)
 ```
 
+Encode the password for the git URL (`!` becomes `%21`; an unencoded `!` fails in zsh):
+
+```bash
+GITEA_PASS_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$GITEA_PASS")
+```
+
 ## 3. Push this repo into Gitea
 
-Uses the variables from step 2. If the password has special characters (`!`), URL-encode it first (`!` → `%21`).
+Uses the variables from step 2.
 
 ```bash
 GIT_SSL_NO_VERIFY=true git push \
-  "https://${GITEA_USER}:${GITEA_PASS}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
+  "https://${GITEA_USER}:${GITEA_PASS_ENC}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
   HEAD:main
 ```
 
@@ -56,7 +62,7 @@ oc -n openshift-gitops wait --for=condition=complete job/argocd-bootstrap-applic
 
 That Job only **creates** the Applications. It does **not** mean the cluster is ready. Argo still has to pull Gitea and sync. While the repo-server is coming up you may see `ComparisonError` / `connection refused` on port `8081`. That is temporary — wait and refresh.
 
-Keep watching until `mvrca-sandbox` is **Synced** (OpenShift AI can take 15–20 minutes):
+Keep watching until `mvrca-sandbox` is **Synced** (OpenShift AI continues in the background and can take 15–20 minutes):
 
 ```bash
 oc get applications.argoproj.io -n openshift-gitops
@@ -83,17 +89,20 @@ oc get route gitea -n gitea -o jsonpath='https://{.spec.host}{"\n"}'
 oc get route openshift-gitops-server -n openshift-gitops -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
-OpenShift AI is slower. There is no `rhods-dashboard` Route on RHOAI 3.x. Wait until `default-dsc` is Ready, then use the data-science gateway:
+OpenShift AI is slower. There is no `rhods-dashboard` Route on RHOAI 3.x. Wait until `mvrca-operators` has created `default-dsc` and the DSC is Ready, then use the data-science gateway:
 
 ```bash
+oc get applications.argoproj.io mvrca-operators -n openshift-gitops
 oc wait --for=jsonpath='{.status.phase}'=Ready dsc/default-dsc --timeout=20m
 oc get route data-science-gateway -n openshift-ingress -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
+If `dsc/default-dsc` is NotFound, `mvrca-operators` is still installing — wait and retry the `oc wait`. The gateway Route can exist before the dashboard UI is Ready; wait for DSC Ready before opening it.
+
 - **Demo** — no login.
 - **Gitea** — Sign In with the username and password from step 2.
 - **Argo CD** — Log in with OpenShift. Apps should be Synced / Healthy.
-- **RHOAI** — Log in with OpenShift. Models: `llama-31-8b` should be Ready.
+- **RHOAI** — Log in with OpenShift. Model `llama-31-8b` becomes Ready after llm-d starts (CPU image can take a while).
 
 ## 7. Check
 
