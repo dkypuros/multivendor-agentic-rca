@@ -79,7 +79,7 @@ Keep watching until `mvrca-sandbox` is **Synced** (OpenShift AI continues in the
 oc get applications.argoproj.io -n openshift-gitops
 ```
 
-You should see `mvrca-platform`, `mvrca-operators`, `mvrca-connectivity-link`, and `mvrca-sandbox`. Do not go to step 5 until `mvrca-sandbox` is Synced — that is when the `mvrca` BuildConfig exists.
+You should see `mvrca-platform`, `mvrca-operators`, `mvrca-gpu-operator`, `mvrca-connectivity-link`, and `mvrca-sandbox`. Do not go to step 5 until `mvrca-sandbox` is Synced — that is when the `mvrca` BuildConfig exists. NFD + NVIDIA GPU Operator come from `mvrca-gpu-operator` (needed before `llama-31-8b-llmisvc-gpu.yaml` can schedule).
 
 ## 5. Build the demo image
 

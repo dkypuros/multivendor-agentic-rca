@@ -177,10 +177,12 @@ The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cl
 
 ```text
 deploy/base/operators/               operator Subscriptions and CRs
+deploy/base/gpu-operator/            NFD + NVIDIA GPU Operator (IMS layout)
 deploy/base/sandbox/                 RAN/RCA workload manifests (Ollama YAML kept here)
 deploy/base/ollama/                  Ollama serving, used by the fallback overlay
 deploy/base/connectivity-link/       Red Hat Connectivity Link (llm-d precondition)
 deploy/overlays/operators/           oc apply -k deploy/overlays/operators
+deploy/overlays/gpu-operator/        oc apply -k deploy/overlays/gpu-operator
 deploy/overlays/connectivity-link/   oc apply -k deploy/overlays/connectivity-link
 deploy/overlays/multivendor/         llm-d (default)  oc apply -k deploy/overlays/multivendor
 deploy/overlays/multivendor-ollama/  Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
@@ -228,6 +230,7 @@ oc apply -k deploy/argocd/apps
 | Application | Path | What it installs |
 |---|---|---|
 | `mvrca-operators` | `deploy/overlays/operators` | OpenShift AI. Add Subscriptions under `deploy/base/operators/subscriptions/`. |
+| `mvrca-gpu-operator` | `deploy/overlays/gpu-operator` | NFD + NVIDIA GPU Operator. Needed for `llama-31-8b-llmisvc-gpu.yaml`. |
 | `mvrca-sandbox` | `deploy/overlays/multivendor` | RAN/RCA sandbox + llm-d. Switch to `deploy/overlays/multivendor-ollama` to use Ollama instead. |
 
 ```bash
