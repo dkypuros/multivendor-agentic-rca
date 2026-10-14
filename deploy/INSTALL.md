@@ -52,19 +52,26 @@ GIT_SSL_NO_VERIFY=true git push \
 
 ## 4. Install Argo CD
 
+Operator and `cluster-admin` for the GitOps controller (needed for cluster-scoped CRs such as `DataScienceCluster`):
+
 ```bash
 oc apply -k deploy/argocd
 ```
 
-That apply also binds `cluster-admin` to the GitOps application controller so it can create cluster-scoped CRs (`DataScienceCluster`, `DSCInitialization`). Re-run the same command if you installed Argo CD before this binding existed.
-
-Wait for the bootstrap Job:
+Wait until the Application CRD exists (GitOps operator installing):
 
 ```bash
-oc -n openshift-gitops wait --for=condition=complete job/argocd-bootstrap-application-v1 --timeout=30m
+oc wait --for=condition=established crd/applications.argoproj.io --timeout=20m
+oc -n openshift-gitops rollout status deploy/openshift-gitops-server --timeout=20m
 ```
 
-That Job only **creates** the Applications. It does **not** mean the cluster is ready. Argo still has to pull Gitea and sync. While the repo-server is coming up you may see `ComparisonError` / `connection refused` on port `8081`. That is temporary — wait and refresh.
+Then create the AppProject and Applications (plain YAML, not a Job or ConfigMap):
+
+```bash
+oc apply -k deploy/argocd/apps
+```
+
+Argo still has to pull Gitea and sync. While the repo-server is coming up you may see `ComparisonError` / `connection refused` on port `8081`. That is temporary — wait and refresh.
 
 Keep watching until `mvrca-sandbox` is **Synced** (OpenShift AI continues in the background and can take 15–20 minutes):
 

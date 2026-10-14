@@ -214,18 +214,16 @@ GIT_SSL_NO_VERIFY=true git push \
 
 Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd`).
 
-### 3. Bootstrap Argo CD and operator subscriptions
+### 3. Install Argo CD and Applications
 
 ```bash
-if oc get namespace openshift-gitops >/dev/null 2>&1; then
-  oc delete job -n openshift-gitops argocd-bootstrap-application-v1 --ignore-not-found
-fi
 oc apply -k deploy/argocd
+oc wait --for=condition=established crd/applications.argoproj.io --timeout=20m
+oc -n openshift-gitops rollout status deploy/openshift-gitops-server --timeout=20m
+oc apply -k deploy/argocd/apps
 ```
 
-If you rerun bootstrap after changing this repository, deleting the old Job first avoids the Kubernetes immutable Job template error.
-
-The bootstrap Job waits for the Argo CD CR, then applies:
+`deploy/argocd` is the GitOps operator. `deploy/argocd/apps` is the AppProject plus root Applications (plain YAML).
 
 | Application | Path | What it installs |
 |---|---|---|
