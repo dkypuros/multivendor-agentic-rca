@@ -1,0 +1,31 @@
+# Applied with `oc apply -k deploy/argocd` (cluster-admin user). The GitOps
+# controller cannot grant itself RBAC, and ClusterPolicy (nvidia.com) is the
+# one cluster-scoped CR this PR adds that isn't already covered by a scoped
+# ClusterRole (DSC/DSCI -> operators/rbac/gitops-rhoai.yaml, Gateway ->
+# gateway-access/gitops-gateway.yaml). Scoped the same way those are, instead
+# of granting cluster-admin outright.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mvrca-gpu-operator-edit
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+rules:
+  - apiGroups: ["nvidia.com"]
+    resources: ["clusterpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mvrca-gpu-operator-edit
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mvrca-gpu-operator-edit
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops

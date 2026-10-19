@@ -5,4 +5,4 @@ resources:
   - namespace.yaml
   - gitops-operator-group.yaml
   - gitops-operator-subscription.yaml
-  - gitops-cluster-admin.yaml
+  - gitops-gpu-operator-edit.yaml

@@ -23,15 +23,8 @@ subjects:
     name: gitea
     namespace: gitea
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitea-admin-credentials
-  namespace: gitea
-stringData:
-  username: gitadmin
-  password: GiteaAdmin123!
-type: Opaque
+# gitea-admin-credentials is generated at apply time by secret-generator.yaml, not
+# committed here -- see that file for why (this repo is public).
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -124,9 +117,15 @@ spec:
             - name: GITEA__security__INSTALL_LOCK
               value: "true"
             - name: GITEA__security__SECRET_KEY
-              value: mvrca-gitea-secret-key
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: secret_key
             - name: GITEA__security__INTERNAL_TOKEN
-              value: mvrca-gitea-internal-token
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-admin-credentials
+                  key: internal_token
             - name: GITEA__service__DISABLE_REGISTRATION
               value: "true"
             - name: GITEA__server__DOMAIN
