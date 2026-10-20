@@ -74,7 +74,7 @@ Every value below is an environment variable. The manifests in `deploy/base/sand
 | `ODU_URL`, `PTP_BRIDGE_URL`, `CAPIF_URL`, `MCP_GATEWAY_URL` | `http://ran-slice:7010`, `http://ptp-bridge:7091`, `http://capif:7027`, `http://mcp-gateway:8800` | Upstreams |
 | `AI_GATEWAY_URL` | empty (no LLM) | OpenAI-compatible base URL, without `/v1` |
 | `LLM_MODEL` / `LLM_API_KEY` | `llama31-8b-w8a8` / `none` | |
-| `LLM_TIMEOUT` / `LLM_MAX_TOKENS` | `90` / `200` | |
+| `LLM_TIMEOUT` / `LLM_MAX_TOKENS` | `90` / `4096` | |
 | `NIC_FAULT_MODE` | `follow-ptp` | `follow-ptp`: the emulated NIC reports a fault only while PTP was read and is unlocked. `always` / `never` pin it. The NIC plane never counts toward the decision bar. |
 | `MLFLOW_TRACKING_URI` | empty | Label copied into traces; nothing is logged to MLflow |
 | `POD_NAMESPACE` | set from the Downward API | Shown by `/nep/health` |

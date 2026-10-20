@@ -30,7 +30,7 @@ MLFLOW_URL = os.environ.get("MLFLOW_TRACKING_URI", "").rstrip("/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "llama31-8b-w8a8")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "none")
 LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "90"))        # CPU-served 8B models are slow
-LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "200"))
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
 # The Intel NIC plane is EMULATED (no E810 hardware timestamps). follow-ptp: it reports the
 # egress-timestamp fault only while the PTP plane is actually unlocked; always / never pin it.
 NIC_FAULT_MODE = os.environ.get("NIC_FAULT_MODE", "follow-ptp")

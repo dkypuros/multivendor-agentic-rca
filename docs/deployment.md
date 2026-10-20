@@ -156,7 +156,7 @@ oc rollout restart deployment/nep-orchestrator
 ```
 
 - `AI_GATEWAY_URL` is the base URL, without `/v1`. `LLM_MODEL` must match an id from `GET <url>/v1/models`.
-- Optional keys in the same Secret: `LLM_TIMEOUT` (seconds, default 90) and `LLM_MAX_TOKENS` (default 200). Small CPU-served models run at about 5 tokens/s, so keep the timeout generous.
+- Optional keys in the same Secret: `LLM_TIMEOUT` (seconds, default 90) and `LLM_MAX_TOKENS` (default 4096, large enough that the narrative's three-part answer — failure sequence, corroboration reasoning, remediation — never gets cut off mid-sentence). Small CPU-served models run at about 5 tokens/s, so keep the timeout generous; a longer completion also takes longer to generate, so if you're on slow/small hardware, watch the timeouts below.
 - Check the result: the RCA panel's model label shows your model id and latency. With no LLM, or a failing one, the narrative starts with `[template - LLM unavailable]`, and the span `Enterprise.AI.LLM_Synthesis` has status `FALLBACK`. The reason is in `llmSynthesis.llm_error`: `oc exec deploy/nep-orchestrator -- python3 -c "import urllib.request,json;print(json.load(urllib.request.urlopen('http://127.0.0.1:7095/nep/audit/latest'))['llmSynthesis'])"`.
 - **Timeouts, innermost first:** `LLM_TIMEOUT` (NEP → LLM, default 90 s), then `RCA_TIMEOUT` on `ran-sandbox-controller` (console → NEP, default 150 s), then the Route (browser → console, 180 s). Keep them in that order if you raise any of them.
 
