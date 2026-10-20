@@ -1,4 +1,6 @@
-# OpenShift AI llm-d on NVIDIA GPU. Either this file or llama-31-8b-llmisvc-cpu.yaml
+# OpenShift AI llm-d on NVIDIA GPU. 
+# see llama-31-8b-llmisvc-gpu-small.yaml for GPUs with less than 24GB of RAM
+# see llama-31-8b-llmisvc-cpu.yaml for clusters with no GPU available
 # — pick one in kustomization.yaml and push Gitea.
 # Requires a node with nvidia.com/gpu (GPU Operator). Same model, gateway, and
 # in-cluster URL as the CPU file.
