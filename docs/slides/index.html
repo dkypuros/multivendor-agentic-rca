@@ -131,7 +131,7 @@
     <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#4-agentic-root-cause-analysis-6-minutes">Run RCA</a></td><td>CAPIF token, 4 MCP tool calls, <code>OC-TimingDegraded</code>, <b>2/3 → HOLD</b>, TMF688 event</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py">nep_orchestrator.py</a></td></tr>
     <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#5-heal-and-re-check-2-minutes">Heal Timing</a></td><td>PTP <code>LOCKED</code>, cell <code>ACTIVE</code>, alarm cleared</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/ran/sandbox_controller.py">sandbox_controller.py</a></td></tr>
     <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#5-heal-and-re-check-2-minutes">Run RCA again</a></td><td><b>0/3 → NO ACTION</b>: the verdict follows the evidence</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/examples/heal-recheck-run.md">example run</a></td></tr>
-    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#6-stop-1-minute">Stop RAN Slice</a></td><td>Pod scales 1→0, CPU and memory released</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/openshift/ran-slice.yaml">ran-slice.yaml</a></td></tr>
+    <tr><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md#6-stop-1-minute">Stop RAN Slice</a></td><td>Pod scales 1→0, CPU and memory released</td><td><a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/base/sandbox/ran-slice.yaml">ran-slice.yaml</a></td></tr>
   </table>
   <p class="hint">Full presenter script with talk tracks: <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/demo-walkthrough.md">demo walkthrough</a> (about 20 minutes).</p>
 </section>
@@ -184,14 +184,14 @@
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/orchestrator/nep_orchestrator.py"><title>NEP agent code</title><rect x="270" y="60" width="160" height="54" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/services/core/capif/capif.py"><title>CAPIF code</title><rect x="500" y="60" width="150" height="54" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/docs/deployment.md#optional-connect-an-llm"><title>Connect an LLM</title><rect x="720" y="60" width="150" height="54" rx="6"/></a>
-      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/openshift/gateway-policy.yaml"><title>Gateway policy (scopes)</title><rect x="500" y="170" width="150" height="54" rx="6"/></a>
+      <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/deploy/base/sandbox/gateway-policy.yaml"><title>Gateway policy (scopes)</title><rect x="500" y="170" width="150" height="54" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ocloud_tools.py"><title>O-Cloud plane code</title><rect x="720" y="150" width="150" height="40" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ran_tools.py"><title>RAN plane code</title><rect x="720" y="200" width="150" height="40" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/ptp_tools.py"><title>PTP plane code</title><rect x="720" y="250" width="150" height="40" rx="6"/></a>
       <a href="https://github.com/dkypuros/multivendor-agentic-rca/blob/main/src/extensions/sheldon/agentic/nic_tools.py"><title>NIC plane code</title><rect x="720" y="300" width="150" height="40" rx="6"/></a>
     </g>
   </svg>
-  <p class="hint">Click any box to open its code on GitHub. Manifests: <a href="https://github.com/dkypuros/multivendor-agentic-rca/tree/main/deploy/openshift">deploy/openshift</a>.</p>
+  <p class="hint">Click any box to open its code on GitHub. Manifests: <a href="https://github.com/dkypuros/multivendor-agentic-rca/tree/main/deploy/base/sandbox">deploy/base/sandbox</a>.</p>
   <div class="read">
     <ul>
       <li><b>Dashed frame:</b> one OpenShift project. A NetworkPolicy lets pods talk only to each other; the Route to the console is the only way in.</li>
@@ -297,7 +297,7 @@
 cd multivendor-agentic-rca</pre>
   <h3 class="t">2. Deploy (run from the repo folder)</h3>
   <pre>oc new-project multivendor-rca
-oc apply -k deploy/openshift                   # Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
+oc apply -k deploy/overlays/multivendor            # Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
 oc start-build mvrca --from-dir=. --follow     # builds the image from your local clone
 oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca</pre>
   <h3 class="t">3. Open the console and check it</h3>

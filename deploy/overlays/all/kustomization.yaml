@@ -1,0 +1,8 @@
+# oc apply -k deploy/overlays/all
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../operators
+  - ../gpu-operator
+  - ../connectivity-link
+  - ../multivendor

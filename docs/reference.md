@@ -36,7 +36,7 @@
 
 ## Configuration
 
-Every value below is an environment variable. The manifests in `deploy/openshift/` set the in-namespace values; the defaults shown are the code's own.
+Every value below is an environment variable. The manifests in `deploy/base/sandbox/` set the in-namespace values; the defaults shown are the code's own.
 
 ### ran-sandbox-controller
 
@@ -83,7 +83,7 @@ Every value below is an environment variable. The manifests in `deploy/openshift
 
 | Deployment | Variable | Value / default |
 |---|---|---|
-| `mcp-gateway` | `--policy` | `/etc/gateway/gateway-policy.yaml` (ConfigMap from `deploy/openshift/gateway-policy.yaml`) |
+| `mcp-gateway` | `--policy` | `/etc/gateway/gateway-policy.yaml` (ConfigMap from `deploy/base/sandbox/gateway-policy.yaml`) |
 | `mcp-ran` | `RAN_O1_URL` | `http://ran-slice:7010`. Required; without it the RAN plane answers `unavailable`. |
 | `mcp-redhat` | `TELCO_PTP_URL`, `PTP_OFFSET_LIMIT_NS` | `http://ptp-bridge:7091`, `100000` |
 | `mcp-intel` | `NIC_FAULT` | Server-wide default; the orchestrator passes `fault` per call |

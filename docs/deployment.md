@@ -8,7 +8,7 @@ This guide installs the whole use case into **one OpenShift project** from a che
 - [Verify](#verify)
 - [Optional: connect an LLM](#optional-connect-an-llm)
 - [Optional: O-Cloud plane with ACM](#optional-o-cloud-plane-with-acm)
-- [Optional: GitOps with Argo CD](#optional-gitops-with-argo-cd)
+- [Kustomize overlays](#kustomize-overlays)
 - [Use a different namespace](#use-a-different-namespace)
 - [Update after a code change](#update-after-a-code-change)
 - [Uninstall](#uninstall)
@@ -39,7 +39,7 @@ Not required:
 
 ## What gets deployed
 
-`oc apply -k deploy/openshift` creates these in the project:
+`oc apply -k deploy/overlays/multivendor` creates these in the project:
 
 | Deployment | Replicas | Role | Port |
 |---|---|---|---|
@@ -67,21 +67,20 @@ All 10 Deployments run **one image**; each one's `command` picks the component.
 git clone https://github.com/<you>/multivendor-agentic-rca.git
 cd multivendor-agentic-rca
 
-# 1. Project
-oc new-project multivendor-rca
+# One command (operators + sandbox), or the two overlays below
+oc apply -k deploy/overlays/all
+# oc apply -k deploy/overlays/operators    # OpenShift AI
+# oc apply -k deploy/overlays/multivendor  # RAN/RCA sandbox (creates the project)
 
-# 2. All manifests (Deployments start in ImagePullBackOff until step 3 finishes; that's expected)
-oc apply -k deploy/openshift
+# Build the image from this checkout (about 2 minutes; uploads the directory as a binary build)
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
 
-# 3. Build the image from this checkout (about 2 minutes; uploads the directory as a binary build)
-oc start-build mvrca --from-dir=. --follow
+# Restart onto the freshly built image
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
 
-# 4. Restart onto the freshly built image
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
-
-# 5. Wait for readiness (ran-slice stays at 0/0 by design)
-oc get deploy
-oc get route ran-sandbox -o jsonpath='https://{.spec.host}{"\n"}'
+# Wait for readiness (ran-slice stays at 0/0 by design)
+oc get deploy -n multivendor-rca
+oc get route ran-sandbox -n multivendor-rca -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
 Open the URL. The header should read **RAN STOPPED (IDLE)**, and the PTP panel should show `LOCKED`.
@@ -133,7 +132,20 @@ oc exec deploy/ran-sandbox-controller -- python3 -c \
 
 ## Optional: connect an LLM
 
-The NEP orchestrator can ask any **OpenAI-compatible** `/v1/chat/completions` endpoint to narrate the evidence. Examples are vLLM, LiteLLM, OpenShift AI model serving, or OVMS with an OpenAI front end. The LLM only writes the narrative. The diagnosis and decision come from a deterministic routing table.
+The NEP orchestrator can ask any **OpenAI-compatible** `/v1/chat/completions` endpoint to narrate the evidence. The LLM only writes the narrative. The diagnosis and decision come from a deterministic routing table.
+
+**Default (`deploy/overlays/multivendor`):** OpenShift AI Distributed Inference with **llm-d** (`LLMInferenceService` for Llama 3.1 8B Instruct). Pick **one** file in that overlay's `kustomization.yaml` and push Gitea: `llama-31-8b-llmisvc-cpu.yaml` (default, no GPU) or `llama-31-8b-llmisvc-gpu.yaml` (NVIDIA, `nvidia.com/gpu: 1`). NEP is pointed at the in-cluster workload Service. Connectivity Link is a DSC precondition and is installed from `deploy/overlays/connectivity-link`.
+
+**Switch back to Ollama:** keep `deploy/base/sandbox/llama-31-8b.yaml` and apply the Ollama overlay (or, under GitOps, change `mvrca-sandbox` to this path):
+
+```bash
+oc apply -k deploy/overlays/multivendor-ollama
+# GitOps: spec.source.path: deploy/overlays/multivendor-ollama
+```
+
+Gated Hugging Face models need a Secret `hf-secret` with key `HF_TOKEN` in `multivendor-rca` (commit it to Git; do not `oc patch`).
+
+To point NEP at some other OpenAI-compatible endpoint instead of either overlay:
 
 ```bash
 oc create secret generic llm-endpoint \
@@ -161,34 +173,96 @@ Every visible ManagedCluster then testifies. One that is not `Available` raises 
 
 The gateway policy only allows `ocloud_cluster_health` from this plane. The O-Cloud *action* tools (power, reprovision) stay out of scope.
 
-## Optional: GitOps with Argo CD
+## Kustomize overlays
 
-`deploy/argocd/application.yaml` is a ready-made Application for `deploy/openshift`. Edit `repoURL` (and its namespace, if you're not on OpenShift GitOps), give Argo CD read access to your repo, then apply it.
+```text
+deploy/base/operators/               operator Subscriptions and CRs
+deploy/base/gpu-operator/            NFD + NVIDIA GPU Operator (IMS layout)
+deploy/base/sandbox/                 RAN/RCA workload manifests (Ollama YAML kept here)
+deploy/base/ollama/                  Ollama serving, used by the fallback overlay
+deploy/base/connectivity-link/       Red Hat Connectivity Link (llm-d precondition)
+deploy/overlays/operators/           oc apply -k deploy/overlays/operators
+deploy/overlays/gpu-operator/        oc apply -k deploy/overlays/gpu-operator
+deploy/overlays/connectivity-link/   oc apply -k deploy/overlays/connectivity-link
+deploy/overlays/multivendor/         llm-d (default)  oc apply -k deploy/overlays/multivendor
+deploy/overlays/multivendor-ollama/  Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
+deploy/overlays/all/                 oc apply -k deploy/overlays/all
+```
 
-The default OpenShift GitOps instance only manages namespaces labelled `argocd.argoproj.io/managed-by: openshift-gitops`. The Application sets that label on the namespace it creates (`managedNamespaceMetadata`). If the namespace already exists, add the label yourself: `oc label ns multivendor-rca argocd.argoproj.io/managed-by=openshift-gitops`.
+Optional GitOps (Gitea + Argo CD) still points at those same two overlays. Bootstrap: `oc apply -k deploy/gitea` then `oc apply -k deploy/argocd`.
 
-It sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
+### 1. Deploy Gitea
 
-Argo CD deploys the manifests. You still build the image with `oc start-build mvrca --from-dir=.`, or point a CI pipeline at the `Containerfile`.
+```bash
+oc apply -k deploy/gitea
+oc -n gitea rollout status deploy/gitea
+```
+
+Credentials are Secret `gitea-admin-credentials` in namespace `gitea`. Read them before you push (see [deploy/INSTALL.md](../deploy/INSTALL.md) step 2).
+
+### 2. Push this repo into Gitea
+
+Assign hostname, username, and password, then push. URL-encode special characters in the password (`!` → `%21`).
+
+```bash
+GITEA_HOST=$(oc get route gitea -n gitea -o jsonpath='{.spec.host}')
+GITEA_USER=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.username}' | base64 -d)
+GITEA_PASS=$(oc get secret gitea-admin-credentials -n gitea -o jsonpath='{.data.password}' | base64 -d)
+
+GIT_SSL_NO_VERIFY=true git push \
+  "https://${GITEA_USER}:${GITEA_PASS}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
+  HEAD:main
+```
+
+Argo CD Applications track `main`. Push that branch (or change `targetRevision` in `deploy/argocd`).
+
+### 3. Install Argo CD and Applications
+
+```bash
+oc apply -k deploy/argocd
+oc wait --for=condition=established crd/applications.argoproj.io --timeout=20m
+oc -n openshift-gitops rollout status deploy/openshift-gitops-server --timeout=20m
+oc apply -k deploy/argocd/apps
+```
+
+`deploy/argocd` is the GitOps operator. `deploy/argocd/apps` is the AppProject plus root Applications (plain YAML).
+
+| Application | Path | What it installs |
+|---|---|---|
+| `mvrca-operators` | `deploy/overlays/operators` | OpenShift AI. Add Subscriptions under `deploy/base/operators/subscriptions/`. |
+| `mvrca-gpu-operator` | `deploy/overlays/gpu-operator` | NFD + NVIDIA GPU Operator. Needed for `llama-31-8b-llmisvc-gpu.yaml`. |
+| `mvrca-sandbox` | `deploy/overlays/multivendor` | RAN/RCA sandbox + llm-d. Switch to `deploy/overlays/multivendor-ollama` to use Ollama instead. |
+
+```bash
+oc get applications.argoproj.io -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.source.targetRevision}{"\t"}{.status.sync.status}{"\n"}{end}'
+```
+
+`mvrca-sandbox` sets `ignoreDifferences` on `ran-slice` `/spec/replicas` with `RespectIgnoreDifferences=true`. **Keep that**: otherwise self-heal immediately undoes the console's Start/Stop.
+
+The image is still built with `oc start-build mvrca -n multivendor-rca --from-dir=.`. Then:
+
+```bash
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
+```
 
 ## Use a different namespace
 
-Change **both** places in `deploy/openshift/kustomization.yaml`:
+Change **both** places in `deploy/base/sandbox/kustomization.yaml` (and `deploy/overlays/multivendor/namespace.yaml`):
 - `namespace:`
 - the namespace segment of `images[0].newName`, `image-registry.openshift-image-registry.svc:5000/<namespace>/mvrca`
 
-Also use the new name in `oc new-project`, `oc delete project` and, if you use it, `deploy/argocd/application.yaml` (`destination.namespace`). Services address each other by short name, so nothing else changes.
+Also use the new name in `oc delete project`. Services address each other by short name, so nothing else changes.
 
 ## Update after a code change
 
 ```bash
-oc start-build mvrca --from-dir=. --follow
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
 ```
 
 The Deployments use the `latest` tag with `imagePullPolicy: Always`, so a restart picks up the new build. `ran-slice` pulls it the next time you press **Start**.
 
-After editing `deploy/openshift/gateway-policy.yaml`, re-apply and run `oc rollout restart deployment/mcp-gateway`. The gateway only reads its policy at startup.
+After editing `deploy/base/sandbox/gateway-policy.yaml`, re-apply and run `oc rollout restart deployment/mcp-gateway`. The gateway only reads its policy at startup.
 
 ## Uninstall
 
@@ -203,7 +277,7 @@ This is a lab deployment. Know these before you share the URL:
 - **The console has no login.** Anyone who can reach the Route can start or stop the RAN slice (up to 2 CPU / 2 GiB), inject or heal the timing fault, and trigger RCAs, which call your LLM if one is configured. To restrict it:
   - put an OAuth proxy in front, or
   - limit source addresses with `oc annotate route ran-sandbox haproxy.router.openshift.io/ip_whitelist="<cidr> <cidr>"`.
-- **CAPIF tokens are unsigned lab JWTs** (`alg: none`), and the MCP gateway checks their issuer, expiry and scope but not a signature. The TS 29.222 exchange and scope-based routing are real, but they don't stop a forged token. **The boundary is the NetworkPolicy** (`deploy/openshift/networkpolicy.yaml`): only pods in this namespace can reach the PTP bridge, the O-DU's O1 config, CAPIF, the gateway, the MCP servers and the orchestrator. Anything that can run a pod in this namespace is trusted.
+- **CAPIF tokens are unsigned lab JWTs** (`alg: none`), and the MCP gateway checks their issuer, expiry and scope but not a signature. The TS 29.222 exchange and scope-based routing are real, but they don't stop a forged token. **The boundary is the NetworkPolicy** (`deploy/base/sandbox/networkpolicy.yaml`): only pods in this namespace can reach the PTP bridge, the O-DU's O1 config, CAPIF, the gateway, the MCP servers and the orchestrator. Anything that can run a pod in this namespace is trusted.
 - The UE key in `src/services/core/udm/subscribers.json` (and the console's `UE_K` default) is the public **3GPP TS 35.208 Test Set 1** key, meant for exactly this kind of lab. No real subscriber data ships.
 - Only the console mounts a ServiceAccount token, and its Role is limited to the calls listed in [What gets deployed](#what-gets-deployed).
 

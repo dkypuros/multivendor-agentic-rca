@@ -1,0 +1,69 @@
+# Merge onto the operator-created Argo CD instance. kustomizeBuildOptions is
+# required so overlays can include ../../base/...
+apiVersion: argoproj.io/v1beta1
+kind: ArgoCD
+metadata:
+  name: openshift-gitops
+  namespace: openshift-gitops
+spec:
+  kustomizeBuildOptions: --load-restrictor LoadRestrictionsNone
+  applicationSet:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 5m
+        memory: 32Mi
+  controller:
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+      requests:
+        cpu: 250m
+        memory: 1Gi
+  rbac:
+    defaultPolicy: role:readonly
+    policy: |
+      g, admin, role:admin
+      g, kubeadmin, role:admin
+      g, kube:admin, role:admin
+      g, system:admin, role:admin
+      g, system:cluster-admins, role:admin
+      g, cluster-admins, role:admin
+      g, system:authenticated, role:readonly
+    scopes: '[groups, preferred_username]'
+  redis:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 64Mi
+      requests:
+        cpu: 5m
+        memory: 32Mi
+  repo:
+    resources:
+      limits:
+        cpu: 250m
+        memory: 512Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+  server:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 5m
+        memory: 32Mi
+  sso:
+    dex:
+      resources:
+        limits:
+          cpu: 250m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi

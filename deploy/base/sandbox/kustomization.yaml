@@ -1,4 +1,4 @@
-# Deploy everything:   oc apply -k deploy/openshift
+# Workload base. Apply via the overlay:  oc apply -k deploy/overlays/multivendor
 # To use a different namespace, change `namespace:` AND the namespace inside `images.newName`.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -16,6 +16,9 @@ resources:
   - mcp.yaml
   - nep-orchestrator.yaml
   - networkpolicy.yaml
+  # LLM serving is overlay-specific:
+  #   overlays/multivendor        → OpenShift AI llm-d (LLMInferenceService)
+  #   overlays/multivendor-ollama → Ollama (base/ollama + llama-31-8b.yaml kept here)
 images:
   - name: mvrca        # every Deployment says `image: mvrca`; this points it at the in-cluster build
     newName: image-registry.openshift-image-registry.svc:5000/multivendor-rca/mvrca

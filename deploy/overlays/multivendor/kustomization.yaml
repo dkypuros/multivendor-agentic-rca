@@ -1,0 +1,19 @@
+# oc apply -k deploy/overlays/multivendor
+# Default LLM: OpenShift AI Distributed Inference with llm-d (LLMInferenceService).
+# Switch back to Ollama: oc apply -k deploy/overlays/multivendor-ollama
+# (GitOps: set mvrca-sandbox path to deploy/overlays/multivendor-ollama).
+#
+# CPU vs GPU: include exactly one llama-31-8b-llmisvc-*.yaml, then push Gitea.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: multivendor-rca
+resources:
+  - namespace.yaml
+  - ../../base/sandbox
+  - llama-gateway.yaml
+  # - llama-31-8b-llmisvc-cpu.yaml
+  - llama-31-8b-llmisvc-gpu.yaml
+  - llama-llmd-networkpolicy.yaml
+  - llm-endpoint-secret.yaml
+patches:
+  - path: nep-llm-patch.yaml

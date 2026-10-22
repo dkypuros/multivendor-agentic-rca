@@ -1,0 +1,8 @@
+# GitOps operator only. Applications are apply -k deploy/argocd/apps after Argo is up.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - gitops-operator-group.yaml
+  - gitops-operator-subscription.yaml
+  - gitops-gpu-operator-edit.yaml

@@ -1,0 +1,32 @@
+# Own Application so NFD/GPU Operator CRDs can appear before ClusterPolicy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mvrca-gpu-operator
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  destination:
+    namespace: nvidia-gpu-operator
+    server: https://kubernetes.default.svc
+  project: mvrca
+  source:
+    path: deploy/overlays/gpu-operator
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 20
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

@@ -37,7 +37,7 @@ CAPIF's own log, from the lab:
 
 ## Honest limits
 
-- **Unsigned tokens.** CAPIF issues unsigned JWTs and the gateway decodes them without checking a signature. This shows the authorization *flow*, not a security boundary. The real boundary is the namespace [NetworkPolicy](../../deploy/openshift/networkpolicy.yaml).
+- **Unsigned tokens.** CAPIF issues unsigned JWTs and the gateway decodes them without checking a signature. This shows the authorization *flow*, not a security boundary. The real boundary is the namespace [NetworkPolicy](../../deploy/base/sandbox/networkpolicy.yaml).
 - **Single-pod shortcut.** The agent publishes the API itself before onboarding. In production the vendor or platform would publish its APIs, and the operator's agent would only onboard and request tokens.
 - No mutual TLS or OAuth client credentials, which production CAPIF would require.
 
@@ -46,4 +46,4 @@ CAPIF's own log, from the lab:
 - CAPIF: [capif.py](../../src/services/core/capif/capif.py), token endpoint [#L286](../../src/services/core/capif/capif.py#L286)
 - Agent side: [nep_orchestrator.py#L90](../../src/services/orchestrator/nep_orchestrator.py#L90) (cache), [#L105](../../src/services/orchestrator/nep_orchestrator.py#L105) (onboarding)
 - Enforcement: [gateway.py#L66](../../src/extensions/sheldon/agentic/gateway.py#L66) (token check), [#L125](../../src/extensions/sheldon/agentic/gateway.py#L125) (scope filter and refusal)
-- Scope to tools map: [gateway-policy.yaml](../../deploy/openshift/gateway-policy.yaml)
+- Scope to tools map: [gateway-policy.yaml](../../deploy/base/sandbox/gateway-policy.yaml)

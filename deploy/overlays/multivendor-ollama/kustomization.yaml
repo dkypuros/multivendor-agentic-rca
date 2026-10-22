@@ -1,0 +1,15 @@
+# oc apply -k deploy/overlays/multivendor-ollama
+# Direct Ollama CPU serving. Canonical manifests stay in deploy/base/sandbox/
+# (llama-31-8b.yaml, llm-endpoint-secret.yaml). This overlay includes them as a
+# directory so `oc apply -k` stays inside Kustomize's load restrictor.
+# GitOps: in deploy/gitops/apps/platform-applications.yaml set
+#   spec.source.path: deploy/overlays/multivendor-ollama
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: multivendor-rca
+resources:
+  - namespace.yaml
+  - ../../base/sandbox
+  - ../../base/ollama
+patches:
+  - path: nep-llm-patch.yaml

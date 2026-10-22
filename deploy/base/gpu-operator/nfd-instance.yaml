@@ -1,0 +1,18 @@
+# From IMS deploy/gitops/operators/configs/node-feature-discovery.yaml
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd-instance
+  namespace: openshift-nfd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  enableTaints: false
+  instance: ""
+  operand:
+    servicePort: 0
+  prunerOnDelete: false
+  topologyUpdater: false
+  workerConfig:
+    configData: ""

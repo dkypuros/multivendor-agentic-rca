@@ -92,7 +92,7 @@ def wait_idle(timeout):
 
 def main():
     policy = Path(tempfile.gettempdir()) / "mvrca-gateway-policy.yaml"
-    text = (REPO / "deploy/openshift/gateway-policy.yaml").read_text()
+    text = (REPO / "deploy/base/sandbox/gateway-policy.yaml").read_text()
     for name, port in MCP.items():
         text = text.replace(f"http://mcp-{name}:{8850 + list(MCP).index(name)}", f"http://127.0.0.1:{port}")
     policy.write_text(text)

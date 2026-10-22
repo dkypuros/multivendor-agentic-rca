@@ -1,0 +1,17 @@
+# Gateway (openshift-ingress) and the RHOAI dashboard call the llm-d workload
+# from outside this namespace. same-namespace-only does not cover that path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-llmd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: llminferenceservice
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { policy-group.network.openshift.io/ingress: "" }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: redhat-ods-applications }

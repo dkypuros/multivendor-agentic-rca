@@ -155,4 +155,4 @@ So the verdict is `OC-TimingDegraded`, 2/3 real planes, **HOLD**. The demo shows
 
 **Honest planes.** Each plane testifies from what its tool actually returned, or says it's unavailable. The NIC plane is emulated and says so in every response. Its fault follows the real PTP state (`NIC_FAULT_MODE=follow-ptp`; an unreachable PTP bridge is *not* treated as a fault), so a healthy system produces a healthy RCA. Emulated planes never count toward the decision bar.
 
-**Security boundary = the namespace.** The CAPIF exchange and gateway scoping are modelled faithfully, but tokens are unsigned. `deploy/openshift/networkpolicy.yaml` limits ingress to pods in the namespace, plus the OpenShift router for the console. The console itself has no login ([security notes](deployment.md#security-notes)).
+**Security boundary = the namespace.** The CAPIF exchange and gateway scoping are modelled faithfully, but tokens are unsigned. `deploy/base/sandbox/networkpolicy.yaml` limits ingress to pods in the namespace, plus the OpenShift router for the console. The console itself has no login ([security notes](deployment.md#security-notes)).

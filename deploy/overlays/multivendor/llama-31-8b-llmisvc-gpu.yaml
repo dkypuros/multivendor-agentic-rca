@@ -1,0 +1,55 @@
+# OpenShift AI llm-d on NVIDIA GPU. Either this file or llama-31-8b-llmisvc-cpu.yaml
+# — pick one in kustomization.yaml and push Gitea.
+# Requires a node with nvidia.com/gpu (GPU Operator). Same model, gateway, and
+# in-cluster URL as the CPU file.
+#
+# Gated Hugging Face models: add a Secret named hf-secret with key HF_TOKEN
+# (GitOps, not oc patch) in the same namespace.
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: llama-31-8b
+  annotations:
+    security.opendatahub.io/enable-auth: "false"
+  labels:
+    opendatahub.io/dashboard: "true"
+spec:
+  replicas: 1
+  model:
+    uri: hf://RedHatAI/Llama-3.1-8B-Instruct
+    name: llama-3.1-8b-instruct
+  router:
+    route: {}
+    gateway:
+      refs:
+        - name: llama-31-8b-gateway
+    scheduler:
+      replicas: 1
+      template:
+        containers:
+          - name: main
+            resources:
+              requests: { cpu: 100m, memory: 256Mi }
+              limits: { cpu: "1", memory: 1Gi }
+  template:
+    containers:
+      - name: main
+        image: registry.redhat.io/rhaii/vllm-cuda-rhel9@sha256:c056e61672b6aea489ad5dde0bd2f8497230f5333e87f7cf6c494eba3bfdc808
+        env:
+          - name: VLLM_ADDITIONAL_ARGS
+            value: "--dtype bfloat16 --max-model-len 2048"
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-secret
+                key: HF_TOKEN
+                optional: true
+        resources:
+          requests:
+            cpu: "2"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 24Gi
+            nvidia.com/gpu: "1"

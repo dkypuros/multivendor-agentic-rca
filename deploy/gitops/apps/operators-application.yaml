@@ -1,0 +1,54 @@
+# GitOps-owned copy of the operators Application. mvrca-platform syncs this
+# path, so Application spec changes (ignoreDifferences, syncOptions) land
+# through Git — not oc patch.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mvrca-operators
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  destination:
+    namespace: openshift-gitops
+    server: https://kubernetes.default.svc
+  project: mvrca
+  source:
+    path: deploy/overlays/operators
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 20
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    - group: "*"
+      kind: "*"
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+        - /metadata/annotations/argocd.argoproj.io~1tracking-id
+    # Operator fills extra spec after create. GitOps cannot keep /spec in sync.
+    - group: dscinitialization.opendatahub.io
+      kind: DSCInitialization
+      jsonPointers:
+        - /spec
+        - /metadata/annotations
+        - /metadata/labels
+    - group: datasciencecluster.opendatahub.io
+      kind: DataScienceCluster
+      jsonPointers:
+        - /spec
+        - /metadata/annotations
+        - /metadata/labels

@@ -41,12 +41,15 @@ The first two columns of the table below matter most. This is a **software lab**
 ```bash
 git clone https://github.com/<you>/multivendor-agentic-rca.git && cd multivendor-agentic-rca
 
-oc new-project multivendor-rca
-oc apply -k deploy/openshift                                   # 10 Deployments, Services, RBAC, NetworkPolicies, Route, BuildConfig
-oc start-build mvrca --from-dir=. --follow                     # build the one image every component runs
-oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca
+oc apply -k deploy/overlays/all              # operators + sandbox
+# or separately:
+#   oc apply -k deploy/overlays/operators    # RHOAI
+#   oc apply -k deploy/overlays/multivendor  # RAN/RCA sandbox
 
-oc get route ran-sandbox -o jsonpath='https://{.spec.host}{"\n"}'   # open this in a browser
+oc start-build mvrca -n multivendor-rca --from-dir=. --follow
+oc rollout restart deployment -l app.kubernetes.io/part-of=multivendor-rca -n multivendor-rca
+
+oc get route ran-sandbox -n multivendor-rca -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
 Verify it the same way the browser drives it:
@@ -89,8 +92,17 @@ python3 tests/e2e_local.py    # starts every component, drives Start/Inject/RCA/
 ## Repository layout
 
 ```
-deploy/openshift/     Kustomize: one namespace, every component (oc apply -k)
-deploy/argocd/        Optional Argo CD Application
+deploy/base/operators/              Operator Subscriptions and CRs
+deploy/base/gpu-operator/           NFD + NVIDIA GPU Operator
+deploy/base/sandbox/                RAN/RCA workload manifests (Ollama YAML kept here)
+deploy/base/ollama/                 Ollama serving, used by the fallback overlay
+deploy/overlays/operators/          oc apply -k deploy/overlays/operators
+deploy/overlays/gpu-operator/       oc apply -k deploy/overlays/gpu-operator
+deploy/overlays/multivendor/        llm-d (CPU or GPU via kustomization.yaml)  oc apply -k deploy/overlays/multivendor
+deploy/overlays/multivendor-ollama/ Ollama fallback  oc apply -k deploy/overlays/multivendor-ollama
+deploy/overlays/all/                oc apply -k deploy/overlays/all
+deploy/gitea/                       Optional in-cluster Gitea
+deploy/argocd/                      Optional OpenShift GitOps bootstrap
 Containerfile         UBI9 Python 3.12 image shared by all components
 src/                  The code, laid out as in the upstream telco-lab repo so imports resolve
   services/ran/sandbox_controller.py     the console + API

@@ -11,10 +11,12 @@ import http.server
 import json
 import os
 import base64
+import ssl
 import threading
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 
@@ -51,13 +53,23 @@ ROUTE_TABLE = [
 # Circular buffer for historical O-RAN x TM Forum audit traces
 AUDIT_HISTORY = []
 
+# llm-d vLLM serves HTTPS with a KServe self-signed cert on the in-cluster Service. Only
+# AI_GATEWAY_URL is ever configured to talk HTTPS, so key the relaxed check off that one
+# configured host rather than any HTTPS URL this process might someday be asked to call.
+_LLM_GATEWAY_HOST = urllib.parse.urlparse(AI_GATEWAY_URL).hostname if AI_GATEWAY_URL else None
+
+def _ssl_ctx(url):
+    if url.startswith("https://") and _LLM_GATEWAY_HOST and urllib.parse.urlparse(url).hostname == _LLM_GATEWAY_HOST:
+        return ssl._create_unverified_context()
+    return None
+
 def _req(method, url, body=None, headers=None, timeout=5):
     data = json.dumps(body).encode() if body is not None else None
     h = {"Content-Type": "application/json"}
     h.update(headers or {})
     req = urllib.request.Request(url, data=data, headers=h, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx(url)) as r:
             return r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
         try:
@@ -70,7 +82,7 @@ def _req(method, url, body=None, headers=None, timeout=5):
 def fetch_json(url, timeout=5):
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "NEP-Orchestrator/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx(url)) as r:
             return json.loads(r.read().decode())
     except Exception as e:
         return {"error": str(e), "url": url}

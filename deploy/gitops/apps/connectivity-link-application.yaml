@@ -1,0 +1,31 @@
+# Own Application so Connectivity Link is not blocked by DSCI re-apply in mvrca-operators.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mvrca-connectivity-link
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  destination:
+    namespace: openshift-operators
+    server: https://kubernetes.default.svc
+  project: mvrca
+  source:
+    path: deploy/overlays/connectivity-link
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitadmin/multivendor-agentic-rca.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 20
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true

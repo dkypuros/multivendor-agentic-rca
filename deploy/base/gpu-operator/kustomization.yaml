@@ -1,0 +1,12 @@
+# NFD + NVIDIA GPU Operator (IMS layout). Apply via overlay:
+#   oc apply -k deploy/overlays/gpu-operator
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - nfd-operatorgroup.yaml
+  - nfd-subscription.yaml
+  - nfd-instance.yaml
+  - gpu-operatorgroup.yaml
+  - gpu-subscription.yaml
+  - gpu-cluster-policy.yaml
