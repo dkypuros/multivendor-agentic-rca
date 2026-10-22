@@ -1,4 +1,6 @@
-# OpenShift AI llm-d on CPU. Either this file or llama-31-8b-llmisvc-gpu.yaml
+# OpenShift AI llm-d on CPU. 
+# see llama-31-8b-llmisvc-gpu-small.yaml for GPUs with less than 24GB of RAM
+# see llama-31-8b-llmisvc-cpu.yaml for clusters with no GPU available
 # — pick one in kustomization.yaml and push Gitea.
 # In-cluster OpenAI base URL: https://llama-31-8b-kserve-workload-svc:8000
 #
