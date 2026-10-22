@@ -42,6 +42,8 @@ GITEA_PASS_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(s
 
 ## 3. Push this repo into Gitea
 
+> **NOTE:** If you are using a GPU with less than 24Gb of RAM, or need to use CPU Inference please see the [Troubleshooting](#troubleshooting) section below before continuing
+
 Uses the variables from step 2.
 
 ```bash
@@ -128,4 +130,42 @@ oc get pods -n multivendor-rca | grep llama-31-8b
 oc get pods -n multivendor-rca
 oc get llminferenceservice -n multivendor-rca
 python3 tests/smoke_route.py "https://$(oc get route ran-sandbox -n multivendor-rca -o jsonpath='{.spec.host}')"
+```
+
+## Troubleshooting
+
+The defaults used in this repo will deploy on a GPU with a minimum of 24GB of ram. For scenarios with GPUs with less than 24GB of RAM, or no GPU available, use one of the following scenarios:
+
+### GPU with 16GB of RAM
+
+1. edit `/deploy/overlays/multivendor/kustomization.yaml`
+2. uncomment the line `  # - llama-31-8b-llmisvc-gpu-small.yaml`
+3. comment the line `  - llama-31-8b-llmisvc-gpu.yaml`
+4. run `git add /deploy/overlays/multivendor/kustomization.yaml`
+5. run `git commit -m "changing gpu settings"`
+6. Return to the [Install Argo CD](#4-install-argo-cd) section to complete the install
+
+If you have already deployed the application and you are modifying a running system, be sure to push your changes to the repo:
+```bash
+GIT_SSL_NO_VERIFY=true git push \
+  "https://${GITEA_USER}:${GITEA_PASS_ENC}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
+  HEAD:main
+```
+
+### CPU Only
+
+This has also been tested using CPU only inference. This is a very slow process, but can be used in worse case scenarios. To enable CPU based inference
+
+1. edit `/deploy/overlays/multivendor/kustomization.yaml`
+2. uncomment the line `  # - llama-31-8b-llmisvc-cpu.yaml`
+3. comment the line `  - llama-31-8b-llmisvc-gpu.yaml`
+4. run `git add /deploy/overlays/multivendor/kustomization.yaml`
+5. run `git commit -m "changing gpu settings"`
+6. Return to the [Install Argo CD](#4-install-argo-cd) section to complete the install
+
+If you have already deployed the application and you are modifying a running system, be sure to push your changes to the repo:
+```bash
+GIT_SSL_NO_VERIFY=true git push \
+  "https://${GITEA_USER}:${GITEA_PASS_ENC}@${GITEA_HOST}/${GITEA_USER}/multivendor-agentic-rca.git" \
+  HEAD:main
 ```

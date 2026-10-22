@@ -12,6 +12,7 @@ resources:
   - ../../base/sandbox
   - llama-gateway.yaml
   # - llama-31-8b-llmisvc-cpu.yaml
+  # - llama-31-8b-llmisvc-gpu-small.yaml
   - llama-31-8b-llmisvc-gpu.yaml
   - llama-llmd-networkpolicy.yaml
   - llm-endpoint-secret.yaml
